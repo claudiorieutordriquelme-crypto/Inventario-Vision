@@ -93,45 +93,82 @@ console.log(`${archivos.length} migraciones en el directorio, ${yaAplicadas.size
 if (ENSAYO) console.log("MODO ENSAYO: se aplica todo y se vuelve atrás. No se escribe nada.\n");
 else console.log("");
 
-let aplicadas = 0;
-
-for (const archivo of archivos) {
-  const version = archivo.slice(0, archivo.indexOf("_"));
-  const nombre = archivo.slice(archivo.indexOf("_") + 1).replace(/\.sql$/, "");
-
-  if (yaAplicadas.has(version) && !ENSAYO) {
-    console.log(`  omitida  ${archivo}`);
-    continue;
-  }
-
-  const cuerpo = readFileSync(join(DIRECTORIO, archivo), "utf8");
-
-  /*
-    El texto se guarda con dollar-quote. La etiqueta lleva la versión para que
-    no choque con los $function$ que hay dentro de las propias migraciones.
-  */
+/*
+  El texto de cada migración se envuelve en dollar-quote para registrarlo. La
+  etiqueta lleva la versión para que no choque con los $function$ que hay
+  dentro de las propias migraciones.
+*/
+function registroDe(version, nombre, cuerpo) {
   const tag = `$mig_${version}$`;
   if (cuerpo.includes(tag)) {
-    console.error(`  FALLA    ${archivo}: el texto contiene la etiqueta ${tag}`);
+    console.error(`  FALLA    ${version}: el texto contiene la etiqueta ${tag}`);
     process.exit(1);
   }
-
-  const registro =
+  return (
     "insert into supabase_migrations.schema_migrations (version, name, statements)\n" +
     `values ('${version}', '${nombre}', array[${tag}${cuerpo}${tag}])\n` +
-    "on conflict (version) do update set name = excluded.name, statements = excluded.statements;";
+    "on conflict (version) do update set name = excluded.name, statements = excluded.statements;"
+  );
+}
 
-  const sql = `begin;\n\n${cuerpo}\n\n${registro}\n\n${ENSAYO ? "rollback;" : "commit;"}\n`;
+const pendientes = archivos.map((archivo) => ({
+  archivo,
+  version: archivo.slice(0, archivo.indexOf("_")),
+  nombre: archivo.slice(archivo.indexOf("_") + 1).replace(/\.sql$/, ""),
+  cuerpo: readFileSync(join(DIRECTORIO, archivo), "utf8"),
+}));
 
-  const resultado = ejecuta(sql, archivo);
+let aplicadas = 0;
+
+if (ENSAYO) {
+  /*
+    TODAS en una sola transacción, y rollback al final.
+
+    Es la única forma de ensayar una secuencia donde cada migración depende de
+    la anterior: la segunda crea tablas con los tipos que definió la primera,
+    así que ensayarlas por separado con rollback entre medio hace fallar la
+    segunda por algo que en la realidad nunca va a pasar. La primera versión de
+    este script tenía ese defecto y el primer ensayo real lo encontró.
+  */
+  const bloques = pendientes.map(
+    (m) => `-- ${m.archivo}\n${m.cuerpo}\n\n${registroDe(m.version, m.nombre, m.cuerpo)}`,
+  );
+  const sql = `begin;\n\n${bloques.join("\n\n")}\n\nrollback;\n`;
+
+  const resultado = ejecuta(sql, "el ensayo completo");
   if (resultado === null) {
-    console.error(`\nSe detuvo en ${archivo}. Nada de esa migración quedó aplicado.`);
+    console.error("\nEl ensayo falló y no se escribió nada. El error de arriba dice dónde.");
     process.exit(1);
   }
 
-  console.log(`  ${ENSAYO ? "ensayada" : "aplicada"} ${archivo}`);
-  aplicadas += 1;
+  for (const m of pendientes) console.log(`  ensayada ${m.archivo}`);
+  aplicadas = pendientes.length;
+} else {
+  /*
+    Una transacción POR migración. Si la cuarta falla, las tres anteriores
+    quedan aplicadas y registradas, y el script se vuelve a correr desde ahí.
+    Envolverlas todas juntas obligaría a rehacer desde cero cada vez.
+  */
+  for (const m of pendientes) {
+    if (yaAplicadas.has(m.version)) {
+      console.log(`  omitida  ${m.archivo}`);
+      continue;
+    }
+
+    const sql = `begin;\n\n${m.cuerpo}\n\n${registroDe(m.version, m.nombre, m.cuerpo)}\n\ncommit;\n`;
+
+    const resultado = ejecuta(sql, m.archivo);
+    if (resultado === null) {
+      console.error(`\nSe detuvo en ${m.archivo}. Nada de esa migración quedó aplicado.`);
+      console.error("Las anteriores sí, y están registradas: corrige y vuelve a correr.");
+      process.exit(1);
+    }
+
+    console.log(`  aplicada ${m.archivo}`);
+    aplicadas += 1;
+  }
 }
+
 
 console.log(
   `\n${aplicadas} migración(es) ${ENSAYO ? "ensayadas sin escribir" : "aplicadas"}.`,
