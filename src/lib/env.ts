@@ -5,10 +5,19 @@
   boton, con un error que no dice nada. Leerlas aca convierte eso en un fallo
   al iniciar, con el nombre exacto de lo que falta.
 
-  Las NEXT_PUBLIC_ viajan al navegador por diseño: la anon key de Supabase esta
-  pensada para eso y no da acceso a nada sin una sesion, porque RLS decide.
-  ANTHROPIC_API_KEY NO lleva ese prefijo y nunca debe llevarlo: se usa solo en
-  el servidor.
+  NINGUNA lleva el prefijo NEXT_PUBLIC_, y eso es una decision, no un olvido.
+
+  La anon key de Supabase esta disenada para ser publica y no da acceso a nada
+  sin una sesion, porque RLS decide. Podria llevar el prefijo sin riesgo. Pero
+  resulta que NINGUN componente de cliente de esta aplicacion usa Supabase:
+  todo pasa por Server Components, Server Actions y el proxy, que corren en el
+  servidor. El prefijo habria puesto en el paquete del navegador dos valores
+  que nadie iba a leer ahi.
+
+  La consecuencia si algun dia hace falta un cliente de navegador, por ejemplo
+  para suscripciones en tiempo real: hay que volver a agregarle el prefijo a
+  estas dos y crear el cliente con createBrowserClient. Queda anotado para que
+  no haya que redescubrirlo.
 */
 
 function requerida(nombre: string): string {
@@ -21,8 +30,8 @@ function requerida(nombre: string): string {
   return valor.trim();
 }
 
-export const SUPABASE_URL = requerida("NEXT_PUBLIC_SUPABASE_URL");
-export const SUPABASE_ANON_KEY = requerida("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+export const SUPABASE_URL = requerida("SUPABASE_URL");
+export const SUPABASE_ANON_KEY = requerida("SUPABASE_ANON_KEY");
 
 /*
   La clave de Anthropic se lee perezosamente y no con requerida() al importar.

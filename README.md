@@ -86,8 +86,8 @@ Copia `.env.example` a `.env.local` y complétalo. En Vercel, las mismas tres en
 **Settings → Environment Variables**.
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://<ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+SUPABASE_URL=https://<ref>.supabase.co
+SUPABASE_ANON_KEY=<anon key>
 ANTHROPIC_API_KEY=<clave>            # opcional, ver abajo
 ```
 
