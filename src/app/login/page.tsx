@@ -1,0 +1,35 @@
+import Link from "next/link";
+import type { Metadata } from "next";
+import { FormularioLogin } from "./formulario";
+
+export const metadata: Metadata = {
+  title: "Entrar · Inventario",
+  robots: { index: false, follow: false },
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ volver?: string }>;
+}) {
+  const { volver } = await searchParams;
+
+  return (
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-16">
+      <Link href="/" className="text-sm font-semibold text-primario hover:underline">
+        Volver
+      </Link>
+
+      <p className="mt-6 text-xs font-bold tracking-widest text-primario uppercase">Inventario</p>
+      <h1 className="mt-1 text-2xl font-bold text-gris-900">Entrar</h1>
+      <p className="mt-2 text-base text-gris-600">
+        Con la cuenta que te asignaron. Si no tienes uno, pídeselo a quien
+        administra el sistema.
+      </p>
+
+      <FormularioLogin volver={volver ?? ""} />
+    </main>
+  );
+}

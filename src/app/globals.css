@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+/*
+  Paleta e identidad visual.
+
+  Colores corporativos, y son los únicos tres con color que usa la aplicación:
+    primario    #002eff
+    acento      #ff3d00
+    secundario  #41e8b4
+  Los grises son acromáticos: no son un cuarto color, son la tinta del texto y
+  los bordes. Sin una escala neutra no hay interfaz legible.
+
+  CONTRASTE, MEDIDO, NO ESTIMADO. Cada uno tiene un uso permitido y uno
+  prohibido, y la diferencia no es estética:
+
+    primario   #002eff  7,4:1 sobre blanco → texto, botones, enlaces. Libre.
+    acento     #ff3d00  3,5:1 sobre blanco → NUNCA texto pequeño sobre blanco,
+                                             ni texto blanco encima. Sobre él va
+                                             texto NEGRO, que da 6,0:1. Sirve de
+                                             barra, borde, ícono y fondo de
+                                             insignia.
+    secundario #41e8b4  1,6:1 sobre blanco → NUNCA texto, de ningún tamaño. Solo
+                                             relleno, y con texto negro encima,
+                                             que da 13,4:1.
+
+  De ahí se desprende la regla que gobierna toda la interfaz: el estado de una
+  fila nunca se comunica solo por color. Siempre hay además una palabra.
+*/
+
+@theme {
+  /*
+    Se apaga la escala de color por defecto de Tailwind. Sin esto, cualquiera
+    escribe bg-blue-500 sin darse cuenta y la identidad se diluye en un mes.
+  */
+  --color-*: initial;
+
+  --color-primario: #002eff;
+  --color-acento: #ff3d00;
+  --color-secundario: #41e8b4;
+
+  --color-blanco: #ffffff;
+  --color-negro: #0a0a0a;
+
+  /* Escala neutra, derivada del negro de marca. */
+  --color-gris-50: #f7f7f8;
+  --color-gris-100: #efeff1;
+  --color-gris-200: #e2e2e6;
+  --color-gris-300: #c9c9d0;
+  --color-gris-400: #9a9aa5;
+  --color-gris-500: #6f6f7c;
+  --color-gris-600: #55555f;
+  --color-gris-700: #3f3f47;
+  --color-gris-800: #2a2a30;
+  --color-gris-900: #17171b;
+
+  --font-sans: var(--fuente-barlow), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --shadow-tarjeta: 0 1px 2px rgb(10 10 10 / 0.04), 0 1px 3px rgb(10 10 10 / 0.06);
+  --shadow-elevada: 0 2px 4px rgb(10 10 10 / 0.05), 0 8px 24px -8px rgb(10 10 10 / 0.12);
+  --shadow-barra: 0 1px 0 rgb(10 10 10 / 0.06), 0 4px 16px -12px rgb(10 10 10 / 0.2);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-blanco);
+  color: var(--color-gris-900);
+  font-family: var(--font-sans);
+  /* Los números de un inventario se comparan en columna: ancho fijo. */
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  Foco visible siempre. La aplicación se usa con teclado en un escritorio y con
+  el dedo en una bodega; quitar el anillo de foco rompe el primer caso sin
+  ganar nada en el segundo.
+*/
+:focus-visible {
+  outline: 2px solid var(--color-primario);
+  outline-offset: 2px;
+}
+
+td,
+th {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Objetivos táctiles de 44 px en pantalla chica, que es el mínimo usable con
+   guantes o con la mano ocupada. */
+@media (max-width: 640px) {
+  button,
+  a[role="button"],
+  [type="submit"],
+  [type="button"] {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Títulos equilibrados y párrafos sin líneas viudas. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
