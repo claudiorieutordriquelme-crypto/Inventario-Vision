@@ -41,7 +41,8 @@ export default async function NuevoPage() {
 
       {!disponible ? (
         <div className="flex overflow-hidden rounded-lg border border-gris-200">
-          <div className="w-2 shrink-0 bg-acento" aria-hidden="true" />
+          {/* Aviso, no error: la aplicación funciona igual sin el análisis. */}
+          <div className="w-2 shrink-0 bg-marca" aria-hidden="true" />
           <div className="p-4">
             <h2 className="text-sm font-bold text-gris-900">
               El análisis automático no está configurado
@@ -58,7 +59,7 @@ export default async function NuevoPage() {
 
       {categorias.length === 0 ? (
         <div className="flex overflow-hidden rounded-lg border border-gris-200">
-          <div className="w-2 shrink-0 bg-acento" aria-hidden="true" />
+          <div className="w-2 shrink-0 bg-marca" aria-hidden="true" />
           <div className="p-4">
             <h2 className="text-sm font-bold text-gris-900">No hay categorías activas</h2>
             <p className="mt-1.5 max-w-prose text-sm text-gris-600">

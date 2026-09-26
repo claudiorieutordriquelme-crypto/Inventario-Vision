@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ETIQUETA_ROL, obtenerContexto, type Rol } from "@/lib/auth";
+import { LogoLinea } from "@/components/logo";
 import { cerrarSesion } from "@/app/login/acciones";
 import { NavPanel, type ItemNav } from "./nav";
 
@@ -63,22 +64,30 @@ export default async function PanelLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-dvh bg-gris-50">
-      <header className="sticky top-0 z-20 border-b border-gris-200 bg-blanco/90 shadow-barra backdrop-blur">
+      {/*
+        La barra va en el NEGRO de la marca, que es donde el ámbar del logo
+        rinde: 10:1. Sobre el blanco del contenido, ese mismo ámbar daría
+        1,98:1 y el logo se perdería. La clase sobre-negro cambia el color del
+        anillo de foco, que en primario oscuro desaparecería contra el negro.
+      */}
+      <header className="sobre-negro sticky top-0 z-20 bg-negro shadow-barra">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
-          <div className="min-w-0">
-            <p className="text-xs font-bold tracking-widest text-primario uppercase">Inventario</p>
-            <p className="flex flex-wrap items-baseline gap-x-2 text-base font-semibold text-gris-900">
-              <span className="truncate">{perfil.nombre || perfil.email || "Sin nombre"}</span>
-              <span className="rounded border border-gris-300 px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap text-gris-600">
-                {ETIQUETA_ROL[perfil.rol]}
-              </span>
-            </p>
+          <div className="flex min-w-0 items-center gap-4">
+            <LogoLinea className="shrink-0" />
+            <div className="min-w-0 border-l border-gris-700 pl-4">
+              <p className="flex flex-wrap items-baseline gap-x-2 text-base font-semibold text-blanco">
+                <span className="truncate">{perfil.nombre || perfil.email || "Sin nombre"}</span>
+                <span className="rounded border border-gris-600 px-1.5 py-0.5 text-xs font-semibold whitespace-nowrap text-gris-300">
+                  {ETIQUETA_ROL[perfil.rol]}
+                </span>
+              </p>
+            </div>
           </div>
 
           <form action={cerrarSesion}>
             <button
               type="submit"
-              className="shrink-0 rounded-md border border-gris-300 px-3 py-2 text-sm font-semibold text-gris-800 transition-colors hover:border-gris-500"
+              className="shrink-0 rounded-md border border-gris-600 px-3 py-2 text-sm font-semibold text-gris-200 transition-colors hover:border-marca hover:text-marca"
             >
               <span className="sm:hidden">Salir</span>
               <span className="hidden sm:inline">Cerrar sesión</span>

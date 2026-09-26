@@ -22,7 +22,7 @@ export function NavPanel({ items }: { items: ItemNav[] }) {
     destino === "/panel" ? ruta === "/panel" : ruta.startsWith(destino);
 
   return (
-    <nav aria-label="Secciones" className="border-t border-gris-100">
+    <nav aria-label="Secciones" className="border-t border-gris-800">
       <ul className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 sm:px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((s) => {
           const esta = activa(s.ruta);
@@ -31,10 +31,12 @@ export function NavPanel({ items }: { items: ItemNav[] }) {
               <Link
                 href={s.ruta as "/panel"}
                 aria-current={esta ? "page" : undefined}
+                /* Sobre negro, la sección activa va en el ámbar pleno de la
+                   marca: 10:1. El primario oscuro se perdería contra el fondo. */
                 className={`inline-flex items-center border-b-2 px-3 py-3 text-sm whitespace-nowrap transition-colors ${
                   esta
-                    ? "border-primario font-bold text-primario"
-                    : "border-transparent font-semibold text-gris-700 hover:border-gris-300 hover:text-gris-900"
+                    ? "border-marca font-bold text-marca"
+                    : "border-transparent font-semibold text-gris-300 hover:border-gris-500 hover:text-blanco"
                 }`}
               >
                 {s.nombre}

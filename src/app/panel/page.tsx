@@ -96,7 +96,8 @@ export default async function InventarioPage({
             </dd>
           </div>
           <div className="flex overflow-hidden rounded-lg border border-gris-200">
-            <div className="w-2 shrink-0 bg-acento" aria-hidden="true" />
+            {/* Ámbar: "por revisar" pide atención, no es un error. */}
+            <div className="w-2 shrink-0 bg-marca" aria-hidden="true" />
             <div className="p-4">
               <dt className="text-xs font-semibold tracking-wide text-gris-500 uppercase">
                 Por revisar

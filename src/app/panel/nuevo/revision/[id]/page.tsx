@@ -145,7 +145,8 @@ export default async function RevisionPage({ params }: { params: Promise<{ id: s
             <ul className="space-y-3">
               {productos.map((p) => (
                 <li key={p.id} className="flex overflow-hidden rounded-lg border border-gris-200">
-                  <div className="w-2 shrink-0 bg-acento" aria-hidden="true" />
+                  {/* Ámbar porque están en borrador: pendiente de revisión. */}
+                  <div className="w-2 shrink-0 bg-marca" aria-hidden="true" />
                   <div className="min-w-0 flex-1 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                       <div className="min-w-0">

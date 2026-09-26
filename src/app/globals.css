@@ -1,30 +1,51 @@
 @import "tailwindcss";
 
 /*
-  Paleta e identidad visual.
+  Identidad visual: Pánico Ideas.
 
-  Colores corporativos, y son los únicos tres con color que usa la aplicación:
-    primario    #002eff
-    acento      #ff3d00
-    secundario  #41e8b4
-  Los grises son acromáticos: no son un cuarto color, son la tinta del texto y
-  los bordes. Sin una escala neutra no hay interfaz legible.
+  La marca son tres cosas: el negro, el ámbar del lettering y el blanco del
+  círculo. Los grises son acromáticos, la tinta del texto y los bordes; sin una
+  escala neutra no hay interfaz legible.
 
-  CONTRASTE, MEDIDO, NO ESTIMADO. Cada uno tiene un uso permitido y uno
-  prohibido, y la diferencia no es estética:
+  ── LA MEDICIÓN QUE DECIDE TODO LO DEMÁS ───────────────────────────────────
 
-    primario   #002eff  7,4:1 sobre blanco → texto, botones, enlaces. Libre.
-    acento     #ff3d00  3,5:1 sobre blanco → NUNCA texto pequeño sobre blanco,
-                                             ni texto blanco encima. Sobre él va
-                                             texto NEGRO, que da 6,0:1. Sirve de
-                                             barra, borde, ícono y fondo de
-                                             insignia.
-    secundario #41e8b4  1,6:1 sobre blanco → NUNCA texto, de ningún tamaño. Solo
-                                             relleno, y con texto negro encima,
-                                             que da 13,4:1.
+  El ámbar del logo, #F7A823, da 10:1 sobre negro y 1,98:1 sobre blanco. O sea
+  es un color hecho para fondo oscuro, que es exactamente donde vive el logo.
+  Sobre blanco es ilegible como texto: 1,98:1 no alcanza ni para titulares.
 
-  De ahí se desprende la regla que gobierna toda la interfaz: el estado de una
-  fila nunca se comunica solo por color. Siempre hay además una palabra.
+  De ahí la decisión central: LA MARCA TIENE DOS TONOS Y CADA UNO TIENE UN
+  TRABAJO. No es una variación estética, es lo que permite usar el color de la
+  empresa en toda la interfaz sin romper la legibilidad.
+
+    --color-marca      #F7A823   RELLENO. Barras, insignias, el logo, fondos.
+                                 10:1 con texto negro encima. NUNCA como texto
+                                 sobre blanco.
+    --color-primario   #9A6400   TEXTO. Enlaces, botones, foco, la sección
+                                 activa del menú. 5,0:1 sobre blanco, y 5,0:1
+                                 con texto blanco encima. Es el mismo ámbar
+                                 oscurecido hasta que pasa contraste.
+
+  ── EL ROJO NO ES DE MARCA, ES FUNCIONAL ───────────────────────────────────
+
+  La paleta de Pánico Ideas no tiene rojo, y una interfaz que borra datos
+  necesita una señal de peligro que no se confunda con "atención". El ámbar
+  sirve para avisar; para destruir hace falta otra cosa. #C0341B da 5,8:1 sobre
+  blanco y se usa SOLO en errores y acciones destructivas, nunca decorativo.
+
+  Igual que con los grises: es un color de sistema, no de la empresa.
+
+  ── REGLA QUE SE DESPRENDE ─────────────────────────────────────────────────
+
+  El estado de una fila nunca se comunica solo por color: siempre hay además
+  una palabra. Con una paleta de un solo tono cromático eso deja de ser buena
+  práctica y pasa a ser la única forma de que se entienda.
+
+  ── PALETA ANTERIOR (Entel), por si hay que volver ─────────────────────────
+  Se cambia este bloque y nada más; toda la interfaz usa los nombres, no los
+  valores.
+    --color-primario: #002eff;
+    --color-marca: #41e8b4;
+    --color-acento: #ff3d00;
 */
 
 @theme {
@@ -34,24 +55,27 @@
   */
   --color-*: initial;
 
-  --color-primario: #002eff;
-  --color-acento: #ff3d00;
-  --color-secundario: #41e8b4;
-
-  --color-blanco: #ffffff;
+  /* Marca */
+  --color-primario: #9a6400;
+  --color-marca: #f7a823;
+  --color-marca-clara: #eda96f;
   --color-negro: #0a0a0a;
+  --color-blanco: #ffffff;
+
+  /* Funcional, no de marca. Solo errores y acciones destructivas. */
+  --color-acento: #c0341b;
 
   /* Escala neutra, derivada del negro de marca. */
-  --color-gris-50: #f7f7f8;
-  --color-gris-100: #efeff1;
-  --color-gris-200: #e2e2e6;
-  --color-gris-300: #c9c9d0;
-  --color-gris-400: #9a9aa5;
-  --color-gris-500: #6f6f7c;
-  --color-gris-600: #55555f;
-  --color-gris-700: #3f3f47;
-  --color-gris-800: #2a2a30;
-  --color-gris-900: #17171b;
+  --color-gris-50: #f8f7f5;
+  --color-gris-100: #f0eeea;
+  --color-gris-200: #e3e0da;
+  --color-gris-300: #cac6bd;
+  --color-gris-400: #9b968c;
+  --color-gris-500: #706b62;
+  --color-gris-600: #56524a;
+  --color-gris-700: #403d37;
+  --color-gris-800: #2a2825;
+  --color-gris-900: #171614;
 
   --font-sans: var(--fuente-barlow), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 
@@ -84,6 +108,14 @@ body {
 :focus-visible {
   outline: 2px solid var(--color-primario);
   outline-offset: 2px;
+}
+
+/*
+  Sobre fondo negro el foco cambia al ámbar pleno: el primario oscurecido
+  desaparecería contra el negro del encabezado.
+*/
+.sobre-negro :focus-visible {
+  outline-color: var(--color-marca);
 }
 
 td,

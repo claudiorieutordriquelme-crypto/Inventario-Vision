@@ -75,11 +75,14 @@ export const PRESENTACION_ESTADO: Record<
   borrador: {
     etiqueta: "Borrador",
     /*
-      Texto NEGRO sobre el acento, no blanco. Medido: blanco sobre #ff3d00 da
-      3,5:1 y no alcanza para texto pequeño; negro da 6,0:1 y sí.
+      Ámbar de marca, no el rojo. Un borrador pide atención, no es un error, y
+      el rojo está reservado para lo que destruye.
+
+      Texto NEGRO sobre el ámbar. Medido: negro sobre #F7A823 da 10:1; blanco
+      daría 1,98:1 y sería ilegible.
     */
-    insignia: "bg-acento text-negro",
-    barra: "bg-acento",
+    insignia: "bg-marca text-negro",
+    barra: "bg-marca",
     explica: "Lo dejó el análisis de la foto y nadie lo ha revisado todavía.",
   },
   confirmado: {

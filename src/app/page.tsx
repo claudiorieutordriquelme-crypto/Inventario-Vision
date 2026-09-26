@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 
 /*
   Portada. Es lo único que se ve sin sesión, así que no muestra ningún dato:
@@ -7,6 +8,12 @@ import Link from "next/link";
 export default function Portada() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-2xl flex-col justify-center px-6 py-16">
+      {/* El logo sobre su propio fondo negro: es el contexto donde el ámbar
+          rinde, y es como vive la marca. */}
+      <div className="mb-8 inline-flex w-fit items-center rounded-xl bg-negro p-4">
+        <Logo className="size-24" />
+      </div>
+
       <p className="text-xs font-bold tracking-widest text-primario uppercase">Inventario</p>
       <h1 className="mt-2 text-3xl font-bold text-gris-900 sm:text-4xl">
         Una foto, y el producto queda cargado
