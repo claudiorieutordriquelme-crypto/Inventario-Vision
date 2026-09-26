@@ -54,9 +54,9 @@ export function FormularioFoto({ analisisDisponible }: { analisisDisponible: boo
           className="mt-1.5 w-full rounded-md border border-gris-300 px-3 py-2.5 text-base text-gris-900 file:mr-3 file:rounded file:border-0 file:bg-primario file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blanco"
         />
         <span className="mt-1 block text-xs text-gris-500">
-          JPG, PNG o WebP, hasta 10 MB. Una sola foto y un solo producto por
-          vez: con varios productos distintos en la imagen, el análisis se
-          confunde y lo dice.
+          JPG, PNG o WebP, hasta 10 MB. Pueden salir varios productos distintos
+          en la misma foto: mientras se vean completos y sin taparse entre
+          ellos, el análisis los separa y crea uno por cada uno.
         </span>
       </label>
 

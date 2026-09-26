@@ -235,8 +235,16 @@ create trigger movimientos_aplica
 
 create table public.analisis_imagen (
   id uuid primary key default gen_random_uuid(),
-  producto_id uuid references public.productos(id) on delete set null,
 
+  /*
+    NO hay producto_id acá, y la dirección de la relación importa.
+
+    Una foto puede tener varios productos distintos, así que un análisis
+    produce N productos. La llave va del lado de productos (analisis_id), que
+    es el lado "muchos". Ponerla acá obligaría a una fila de análisis por
+    producto, o sea a repetir la misma respuesta del modelo N veces, y con ella
+    el costo y los tokens, que dejarían de poder sumarse sin contar de más.
+  */
   foto_path text not null,
   modelo text not null,
   version_prompt text not null,
@@ -251,6 +259,9 @@ create table public.analisis_imagen (
   costo_usd numeric(12,6),
   duracion_ms integer,
 
+  /* Cuántos productos distintos reconoció en la imagen. */
+  productos_detectados integer not null default 0,
+
   error text,
   creado_por uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now()
@@ -261,5 +272,35 @@ alter table public.analisis_imagen
     confianza is null or (confianza >= 0 and confianza <= 1)
   );
 
-create index analisis_producto_idx on public.analisis_imagen using btree (producto_id);
 create index analisis_fecha_idx on public.analisis_imagen using btree (created_at desc);
+
+/*
+  El vínculo del producto con el análisis que lo creó.
+
+  Se agrega después de crear analisis_imagen porque productos se define antes
+  en este archivo, y una llave foránea no puede apuntar a una tabla que todavía
+  no existe.
+
+  ON DELETE SET NULL: si algún día se purgan análisis viejos, los productos no
+  se van con ellos. El producto es el dato; el análisis es su procedencia.
+*/
+alter table public.productos
+  add column analisis_id uuid references public.analisis_imagen(id) on delete set null;
+
+/*
+  Cuál de los productos de la foto es este. Sirve para dos cosas concretas:
+  ordenar la pantalla de revisión en el mismo orden en que el modelo los
+  enumeró, y poder decir "el segundo de los cuatro" cuando alguien pregunta
+  cuál es cuál.
+*/
+alter table public.productos add column indice_en_foto integer;
+
+/*
+  Dónde está en la imagen, en palabras: "arriba a la izquierda", "el rojo del
+  centro". NO son coordenadas: un recuadro exige dibujarlo sobre la foto para
+  que sirva de algo, y los recuadros que devuelve un modelo de visión son poco
+  fiables. Una frase corta la lee cualquiera y se verifica mirando.
+*/
+alter table public.productos add column ubicacion_en_foto text;
+
+create index productos_analisis_idx on public.productos using btree (analisis_id);

@@ -6,38 +6,58 @@ import { z } from "zod";
 import { claveAnthropic } from "@/lib/env";
 
 /*
-  Analisis de una foto de inventario con Claude.
+  Análisis de una foto de inventario con Claude.
 
-  QUE HACE Y QUE NO HACE, porque la diferencia decide como se etiqueta el
+  UNA FOTO PUEDE TENER VARIOS PRODUCTOS DISTINTOS, y devolver todos es el punto
+  de la herramienta: se llega a la bodega, se apoyan seis cosas en la mesa, una
+  foto, seis productos cargados. Por eso la respuesta es una lista y no un
+  objeto, aunque la mayoría de las veces tenga un solo elemento.
+
+  LA DISTINCIÓN QUE MÁS IMPORTA, y que el prompt de abajo desarrolla: varios
+  productos DISTINTOS son varias entradas de la lista; varias unidades del
+  MISMO producto son una sola entrada con cantidad. Confundirlas rompe el
+  inventario en las dos direcciones: doce entradas de un mismo tornillo, o un
+  martillo y un alicate sumados como "2 unidades" de algo que no existe.
+
+  QUÉ HACE Y QUÉ NO HACE, porque la diferencia decide cómo se etiqueta el
   resultado en pantalla:
 
-  IDENTIFICA el producto de la foto, lo clasifica en una de las categorias que
-  existen en la base, escribe una descripcion breve y ESTIMA un precio.
+  IDENTIFICA cada producto, lo clasifica en una de las categorías que existen
+  en la base, escribe una descripción breve y ESTIMA un precio.
 
   NO CONSULTA LA WEB. El precio sale del conocimiento del modelo, que tiene
-  fecha de corte, no de una busqueda en retail chileno hoy. Es un punto de
+  fecha de corte, no de una búsqueda en retail chileno hoy. Es un punto de
   partida para que una persona lo corrija, no un dato de mercado. Toda la
-  aplicacion lo trata asi: la columna se llama precio_estimado_clp, nunca
-  sobreescribe lo que fija un humano, y la pantalla dice de donde vino.
+  aplicación lo trata así: la columna se llama precio_estimado_clp, nunca
+  sobrescribe lo que fija un humano, y la pantalla dice de dónde vino.
 
-  Si algun dia se quiere el precio real de mercado, el cambio es acotado:
+  Si algún día se quiere el precio real de mercado, el cambio es acotado:
   agregar la herramienta de servidor web_search a esta llamada y guardar las
-  fuentes citadas junto al monto. Queda anotado aca para que no haya que
+  fuentes citadas junto al monto. Queda anotado acá para que no haya que
   reconstruir el razonamiento.
 */
 
 export const MODELO = "claude-opus-5";
 
 /*
-  La version del prompt se guarda con cada analisis. Cuando el prompt cambie,
-  esta constante sube, y asi se puede saber que resultados vinieron de que
-  instrucciones. Sin esto, comparar la calidad entre dos epocas es imposible.
+  La versión del prompt se guarda con cada análisis. Cuando el prompt cambie,
+  esta constante sube, y así se puede saber qué resultados vinieron de qué
+  instrucciones. Sin esto, comparar la calidad entre dos épocas es imposible.
 */
-export const VERSION_PROMPT = "2026-09-03.1";
+export const VERSION_PROMPT = "2026-09-03.2-multiple";
 
-/* Tarifa de claude-opus-5 por millon de tokens, para estimar el costo. */
+/* Tarifa de claude-opus-5 por millón de tokens, para estimar el costo. */
 const USD_POR_MTOK_ENTRADA = 5;
 const USD_POR_MTOK_SALIDA = 25;
+
+/*
+  Tope de productos por foto. No es una preferencia: una foto de una estantería
+  entera daría treinta entradas que nadie va a revisar una por una, y cada una
+  entraría al inventario como borrador. Doce es lo que cabe en una mesa y se
+  alcanza a revisar de una sentada. Si el modelo ve más, lo dice en la
+  observación general y la pantalla lo muestra.
+*/
+export const MAXIMO_POR_FOTO = 12;
 
 const MIME_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 export type MimeImagen = (typeof MIME_PERMITIDOS)[number];
@@ -47,22 +67,27 @@ export function esMimeSoportado(mime: string): mime is MimeImagen {
 }
 
 /*
-  Lo que se le pide al modelo.
+  Lo que se le pide al modelo por cada producto.
 
-  Cada campo admite null a proposito. Un modelo obligado a rellenar un campo
-  que no puede ver inventa, y un inventario con datos inventados es peor que
-  un inventario incompleto: el incompleto se nota, el inventado no.
+  Casi todo admite null a propósito. Un modelo obligado a rellenar un campo que
+  no puede ver inventa, y un inventario con datos inventados es peor que uno
+  incompleto: el incompleto se nota, el inventado no.
 */
-const EsquemaAnalisis = z.object({
+const EsquemaProducto = z.object({
   nombre: z
     .string()
     .describe(
-      "Nombre corto y concreto del producto, como lo escribiria alguien de bodega. Marca y modelo si se leen en la foto. Máximo 80 caracteres.",
+      "Nombre corto y concreto, como lo escribiría alguien de bodega. Marca y modelo si se leen en la foto. Máximo 80 caracteres.",
     ),
   descripcion: z
     .string()
     .describe(
       "Dos o tres frases: qué es, para qué sirve y cualquier característica visible que ayude a identificarlo entre varios parecidos.",
+    ),
+  ubicacion_en_foto: z
+    .string()
+    .describe(
+      "Dónde está en la imagen, en palabras que sirvan para encontrarlo: 'arriba a la izquierda', 'el rojo del centro', 'el más grande, al fondo'. Cuando hay un solo producto, escribe 'toda la imagen'.",
     ),
   categoria_codigo: z
     .string()
@@ -80,7 +105,7 @@ const EsquemaAnalisis = z.object({
     .int()
     .nullable()
     .describe(
-      "Cuántas unidades del mismo producto se ven en la foto. null si no se puede contar con seguridad.",
+      "Cuántas unidades DE ESTE MISMO producto se ven. Si hay tres martillos idénticos, esto es 3 y va en una sola entrada. null si no se puede contar con seguridad.",
     ),
   precio_estimado_clp: z
     .number()
@@ -93,15 +118,29 @@ const EsquemaAnalisis = z.object({
     .min(0)
     .max(1)
     .describe(
-      "Qué tan seguro estás de la identificación, entre 0 y 1. Sé honesto: 0.3 en algo genérico es más útil que 0.9 falso.",
+      "Qué tan seguro estás de ESTA identificación, entre 0 y 1. Sé honesto: 0.3 en algo genérico es más útil que 0.9 falso.",
     ),
   advertencias: z
     .array(z.string())
     .describe(
-      "Lo que la persona debería revisar: foto borrosa, producto parcialmente tapado, varios productos distintos en la imagen, precio muy variable según marca. Lista vacía si no hay nada que advertir.",
+      "Lo que la persona debería revisar de este producto: parcialmente tapado, fuera de foco, precio muy variable según marca. Lista vacía si no hay nada que advertir.",
     ),
 });
 
+const EsquemaAnalisis = z.object({
+  productos: z
+    .array(EsquemaProducto)
+    .describe(
+      `Un elemento por cada producto DISTINTO que veas. Máximo ${MAXIMO_POR_FOTO}. Si no reconoces ningún producto, devuelve la lista vacía.`,
+    ),
+  observacion_general: z
+    .string()
+    .describe(
+      "Una frase sobre la foto completa: si está borrosa, mal iluminada, si hay más productos de los que alcanzaste a listar, o si en realidad no es una foto de productos. Cadena vacía si no hay nada que decir.",
+    ),
+});
+
+export type ProductoDetectado = z.infer<typeof EsquemaProducto>;
 export type Analisis = z.infer<typeof EsquemaAnalisis>;
 
 export type CategoriaOfrecida = { codigo: string; nombre: string; descripcion: string | null };
@@ -111,19 +150,33 @@ function instrucciones(categorias: CategoriaOfrecida[]): string {
     .map((c) => `- ${c.codigo}: ${c.nombre}${c.descripcion ? ` — ${c.descripcion}` : ""}`)
     .join("\n");
 
-  return `Eres el asistente de un sistema de control de inventario en Chile. Recibes la foto de un producto y devuelves los datos para darlo de alta.
+  return `Eres el asistente de un sistema de control de inventario en Chile. Recibes la foto de uno o varios productos y devuelves los datos para darlos de alta.
 
-CATEGORÍAS DISPONIBLES. Elige el código exacto de una de estas, o null:
+LA REGLA MÁS IMPORTANTE: PRODUCTOS DISTINTOS CONTRA UNIDADES DEL MISMO.
+
+Un martillo, un alicate y un destornillador en la misma foto son TRES entradas de la lista.
+Tres martillos idénticos son UNA entrada con cantidad_visible 3.
+Un martillo y tres alicates idénticos son DOS entradas: el martillo con cantidad 1, el alicate con cantidad 3.
+
+Confundir las dos cosas rompe el inventario en las dos direcciones. Doce entradas de un mismo tornillo llenan el sistema de basura que hay que borrar a mano. Un martillo y un alicate sumados como "2 unidades" crean un producto que no existe y esconde los dos que sí.
+
+Cuando dudes si dos objetos son el mismo producto, míralos como los miraría bodega: si se guardarían en la misma caja y se pedirían con el mismo código, son el mismo producto. Si uno es de 12 pulgadas y el otro de 16, son distintos.
+
+Máximo ${MAXIMO_POR_FOTO} productos por foto. Si ves más, lista los ${MAXIMO_POR_FOTO} más claros y dilo en observacion_general.
+
+CATEGORÍAS DISPONIBLES. Para cada producto, elige el código exacto de una de estas, o null:
 ${lista}
 
 Si ninguna calza bien, devuelve null en categoria_codigo. No inventes códigos: un código que no está en esta lista deja el producto sin clasificar igual, y además obliga a alguien a descubrir por qué.
 
 SOBRE EL PRECIO. No tienes acceso a internet en esta llamada, así que el precio es una estimación tuya para el mercado chileno, en pesos, por unidad y con IVA incluido, que es como se muestran los precios al público en Chile. Tres reglas:
-- Si el producto es genérico y su precio varía mucho según marca, dilo en advertencias.
+- Si el producto es genérico y su precio varía mucho según marca, dilo en sus advertencias.
 - Si no tienes base razonable para estimar, devuelve null. Es una respuesta válida y preferible a un número inventado.
 - No presentes el precio como un dato de mercado actual. Alguien lo va a revisar.
 
-SOBRE LA HONESTIDAD DEL RESTO. Una foto borrosa, un producto tapado a medias o varios productos distintos en la misma imagen son situaciones normales en una bodega. Cuando pasen, bájale a la confianza y escríbelo en advertencias. El sistema está hecho para que una persona revise y corrija; lo que no se puede corregir es un dato que parecía seguro y no lo era.
+SOBRE UBICACION_EN_FOTO. Es lo que va a permitir que una persona, mirando la foto, sepa cuál de los seis productos de la lista es cuál. Escribe algo que sirva para encontrarlo: la posición, el color, el tamaño relativo. "Producto 3" no sirve.
+
+SOBRE LA HONESTIDAD. Una foto borrosa, un producto tapado a medias o un objeto que no logras identificar son situaciones normales en una bodega. Cuando pasen, bájale a la confianza de ese producto y escríbelo en sus advertencias. Si la foto no muestra productos identificables, devuelve la lista vacía y explícalo en observacion_general. El sistema está hecho para que una persona revise y corrija; lo que no se puede corregir es un dato que parecía seguro y no lo era.
 
 Escribe en español de Chile, sin adornos.`;
 }
@@ -132,7 +185,7 @@ export type ResultadoAnalisis =
   | {
       ok: true;
       analisis: Analisis;
-      /* Para la bitacora: lo que devolvio el modelo y lo que costo. */
+      /* Para la bitácora: lo que devolvió el modelo y lo que costó. */
       bruto: unknown;
       modelo: string;
       versionPrompt: string;
@@ -144,15 +197,18 @@ export type ResultadoAnalisis =
   | { ok: false; error: string; duracionMs: number };
 
 /*
-  Analiza una imagen y devuelve los campos del producto.
+  Analiza una imagen y devuelve TODOS los productos que reconoce.
 
   La imagen va en base64 dentro del mensaje y no por la Files API: se usa una
-  sola vez, subirla aparte seria un viaje mas a la red por nada.
+  sola vez, subirla aparte sería un viaje más a la red por nada.
 
-  effort en "low" no es ahorrar por ahorrar. Identificar un objeto en una foto
-  y describirlo es una tarea de un solo paso; el esfuerzo alto se gasta en
-  razonamiento que aca no cambia el resultado. Si la calidad no alcanza, este
-  es el primer dial que hay que mover, y esta en un solo lugar.
+  effort en "low" no es ahorrar por ahorrar. Identificar objetos en una foto y
+  describirlos es una tarea de un solo paso; el esfuerzo alto se gasta en
+  razonamiento que acá no cambia el resultado. Si la calidad no alcanza, este
+  es el primer dial que hay que mover, y está en un solo lugar.
+
+  max_tokens sube con el tope de productos: doce fichas completas necesitan
+  espacio, y quedarse corto trunca la respuesta a mitad de un producto.
 */
 export async function analizaImagen(
   imagen: Buffer,
@@ -176,7 +232,7 @@ export async function analizaImagen(
   try {
     const respuesta = await client.messages.parse({
       model: MODELO,
-      max_tokens: 4000,
+      max_tokens: 12000,
       output_config: {
         format: zodOutputFormat(EsquemaAnalisis),
         effort: "low",
@@ -192,7 +248,7 @@ export async function analizaImagen(
             },
             {
               type: "text",
-              text: "Identifica el producto de esta foto y devuelve sus datos para darlo de alta en el inventario.",
+              text: "Identifica todos los productos distintos que veas en esta foto y devuelve sus datos para darlos de alta en el inventario.",
             },
           ],
         },
@@ -202,15 +258,29 @@ export async function analizaImagen(
     const duracionMs = Date.now() - inicio;
 
     /*
-      stop_reason se revisa ANTES de leer el contenido. Un rechazo por politica
+      stop_reason se revisa ANTES de leer el contenido. Un rechazo por política
       llega con HTTP 200 y sin los datos, y leer parsed_output sin mirar esto
-      daria un error de null que no explica nada.
+      daría un error de null que no explica nada.
     */
     if (respuesta.stop_reason === "refusal") {
       return {
         ok: false,
         error:
-          "El modelo no quiso analizar esta imagen. Revisa que sea una foto de un producto y vuelve a intentar, o carga el producto a mano.",
+          "El modelo no quiso analizar esta imagen. Revisa que sea una foto de productos y vuelve a intentar, o carga los productos a mano.",
+        duracionMs,
+      };
+    }
+
+    /*
+      Quedarse sin tokens con una lista larga deja el último producto a medias.
+      Se trata como error en vez de guardar una ficha truncada: media ficha
+      parece una ficha completa y nadie la revisaría dos veces.
+    */
+    if (respuesta.stop_reason === "max_tokens") {
+      return {
+        ok: false,
+        error:
+          "La foto tiene demasiados productos y la respuesta se cortó. Sácale fotos por grupos más chicos.",
         duracionMs,
       };
     }
@@ -219,17 +289,29 @@ export async function analizaImagen(
       return {
         ok: false,
         error:
-          "El modelo respondió, pero no en el formato esperado. Intenta de nuevo o carga el producto a mano.",
+          "El modelo respondió, pero no en el formato esperado. Intenta de nuevo o carga los productos a mano.",
         duracionMs,
       };
     }
+
+    const analisis = respuesta.parsed_output;
+
+    /*
+      El tope se aplica también acá y no solo se pide en el prompt. Una
+      instrucción es una petición; esto es una garantía, y de ella depende que
+      una foto no pueda crear treinta borradores de una vez.
+    */
+    const recortado: Analisis = {
+      ...analisis,
+      productos: analisis.productos.slice(0, MAXIMO_POR_FOTO),
+    };
 
     const tokensEntrada = respuesta.usage.input_tokens;
     const tokensSalida = respuesta.usage.output_tokens;
 
     return {
       ok: true,
-      analisis: respuesta.parsed_output,
+      analisis: recortado,
       bruto: respuesta.content,
       modelo: MODELO,
       versionPrompt: VERSION_PROMPT,
@@ -245,7 +327,7 @@ export async function analizaImagen(
 
     /*
       Se distingue cada falla porque cada una se resuelve distinto, y un
-      mensaje generico manda a la persona a adivinar.
+      mensaje genérico manda a la persona a adivinar.
     */
     if (e instanceof Anthropic.AuthenticationError) {
       console.error("Clave de Anthropic rechazada:", e.message);
@@ -282,7 +364,7 @@ export async function analizaImagen(
     console.error("Fallo inesperado analizando la imagen:", e);
     return {
       ok: false,
-      error: "No pude analizar la imagen. Puedes cargar el producto a mano.",
+      error: "No pude analizar la imagen. Puedes cargar los productos a mano.",
       duracionMs,
     };
   }

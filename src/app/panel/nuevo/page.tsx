@@ -29,10 +29,13 @@ export default async function NuevoPage() {
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-gris-900">Nuevo producto con foto</h1>
         <p className="mt-1 max-w-prose text-base text-gris-600">
-          Saca la foto y el sistema identifica el producto, lo clasifica, le
-          asigna un SKU y propone descripción y precio. Queda en{" "}
-          <strong className="font-semibold text-gris-900">borrador</strong> hasta
-          que lo revises.
+          Saca la foto y el sistema identifica lo que hay, lo clasifica, le
+          asigna un SKU a cada producto y propone descripción y precio.{" "}
+          <strong className="font-semibold text-gris-900">
+            Pueden ser varios productos en una misma foto
+          </strong>
+          : apoya las cosas en una mesa y sácales una sola. Todo queda en
+          borrador hasta que lo revises.
         </p>
       </div>
 
@@ -75,6 +78,14 @@ export default async function NuevoPage() {
         </h2>
         <ul className="mt-3 space-y-2 text-sm text-gris-600">
           <li>
+            <strong className="font-semibold text-gris-900">
+              Reconoce varios productos distintos
+            </strong>{" "}
+            en una misma foto, hasta doce, y crea uno por cada uno. Varias
+            unidades del <em>mismo</em> producto no son varios productos: son
+            cantidad, y las cuenta como tal.
+          </li>
+          <li>
             <strong className="font-semibold text-gris-900">Identifica y clasifica</strong>{" "}
             eligiendo una de tus categorías. Si ninguna calza, deja el producto
             sin categoría en vez de inventar una.
@@ -90,6 +101,11 @@ export default async function NuevoPage() {
             <strong className="font-semibold text-gris-900">Cuenta unidades</strong> solo si se
             ven con claridad, y lo registra como ingreso inicial para que quede
             en el historial.
+          </li>
+          <li>
+            <strong className="font-semibold text-gris-900">Dice dónde está cada uno</strong> en
+            la imagen, con palabras, para que puedas saber cuál de los seis de la
+            lista es cuál al revisarlos.
           </li>
           <li>
             <strong className="font-semibold text-gris-900">Todo es editable</strong> después, en
