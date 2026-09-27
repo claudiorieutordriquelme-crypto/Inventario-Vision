@@ -94,6 +94,7 @@ const SECCIONES = [
   { id: "precios", titulo: "Los dos precios" },
   { id: "cantidad", titulo: "Cantidad y movimientos" },
   { id: "sku", titulo: "El SKU" },
+  { id: "sacar", titulo: "Borrar, archivar y exportar" },
   { id: "roles", titulo: "Los roles" },
   { id: "problemas", titulo: "Cuando algo sale mal" },
 ];
@@ -362,6 +363,62 @@ export default async function GuiaPage() {
         <p className="max-w-prose text-base text-gris-600">
           Es el identificador para buscar: el buscador del inventario lo acepta
           igual que el nombre.
+        </p>
+      </section>
+
+      <section className="space-y-4 border-t border-gris-200 pt-7">
+        <Titulo id="sacar">Sacar un producto del inventario, y llevarte los datos</Titulo>
+
+        <p className="max-w-prose text-base text-gris-600">
+          En el listado, cada producto tiene sus acciones debajo. Hay dos
+          formas de sacarlo de circulación y no son intercambiables.
+        </p>
+
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-gris-200 p-4">
+            <dt className="text-sm font-bold text-gris-900">Archivar</dt>
+            <dd className="mt-1.5 text-sm text-gris-600">
+              Es lo que vas a usar casi siempre. Deja de contarse en las
+              unidades y en la valorización, pero conserva su ficha, su foto y
+              su libro completo. Se puede restaurar desde el mismo listado.
+            </dd>
+          </div>
+          <div className="rounded-lg border border-gris-200 p-4">
+            <dt className="text-sm font-bold text-gris-900">Borrar</dt>
+            <dd className="mt-1.5 text-sm text-gris-600">
+              Desaparece el producto, su foto y su SKU, que no se reutiliza. No
+              se puede deshacer. Solo lo ve un administrador, y hay que escribir
+              el SKU para confirmar.
+            </dd>
+          </div>
+        </dl>
+
+        <div className="flex overflow-hidden rounded-lg border border-gris-200">
+          <div className="w-2 shrink-0 bg-marca" aria-hidden="true" />
+          <p className="max-w-prose p-4 text-base text-gris-700">
+            <strong className="font-semibold text-gris-900">
+              Un producto con movimientos no se puede borrar.
+            </strong>{" "}
+            No es una restricción de la pantalla, es la base de datos: borrarlo
+            dejaría el libro apuntando al vacío. Como el alta por foto deja un
+            conteo inicial, casi todos los productos caen en ese caso, y por eso
+            el listado te ofrece archivar en vez de un botón que iba a fallar.
+          </p>
+        </div>
+
+        <h3 className="pt-2 text-base font-bold text-gris-900">Exportar</h3>
+        <p className="max-w-prose text-base text-gris-600">
+          El botón <strong className="font-semibold text-gris-900">Exportar a Excel</strong> del
+          listado descarga un archivo CSV que se abre con doble clic en Excel,
+          en Google Sheets o en LibreOffice. Se lleva{" "}
+          <strong className="font-semibold text-gris-900">exactamente lo que tienes filtrado</strong>{" "}
+          en pantalla: si filtraste por borradores, bajan solo los borradores.
+        </p>
+        <p className="max-w-prose text-base text-gris-600">
+          Los dos precios van en columnas separadas, más una columna que dice de
+          dónde salió cada uno. Es a propósito: fundirlos en un solo &quot;Precio&quot;
+          es lo que convierte la estimación de un modelo en un dato de gestión
+          que nadie vuelve a cuestionar.
         </p>
       </section>
 

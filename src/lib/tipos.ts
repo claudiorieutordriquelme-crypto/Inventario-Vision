@@ -52,6 +52,15 @@ export type ProductoConCategoria = Producto & {
   categoria_codigo: string | null;
 };
 
+/*
+  Lo que necesita una fila del listado por encima del producto: cuántos
+  movimientos tiene. No es un dato decorativo, decide si la fila se puede
+  borrar: la llave de movimientos_inventario hacia productos es RESTRICT, así
+  que un producto con historial no se borra por ningún camino. Sin este número
+  el listado ofrecería un botón que la base va a rechazar.
+*/
+export type ProductoListado = ProductoConCategoria & { movimientos: number };
+
 export type Movimiento = {
   id: string;
   producto_id: string;

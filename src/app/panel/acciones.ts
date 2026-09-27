@@ -481,3 +481,66 @@ export async function eliminarProducto(_p: EstadoAccion, datos: FormData): Promi
   revalidatePath("/panel");
   redirect("/panel");
 }
+
+/*
+  Archivar y restaurar desde el listado.
+
+  POR QUÉ HACE FALTA UNA ACCIÓN APARTE Y NO SIRVE actualizarProducto. Esa pide
+  el formulario completo de la ficha; desde una fila del listado solo hay un
+  identificador y una intención. Mandar el resto de los campos vacíos
+  borraría datos.
+
+  POR QUÉ IMPORTA QUE ESTÉ EN EL LISTADO. Casi ningún producto se puede borrar:
+  la llave de movimientos_inventario hacia productos es RESTRICT, y todo
+  producto que llegó con un conteo desde una foto ya tiene un movimiento.
+  Archivar es la salida real para la mayoría, así que tiene que estar a un
+  clic y no escondida dentro de la ficha.
+
+  Archivar NO destruye nada: el producto deja de sumar a las unidades y a la
+  valorización, y conserva su ficha, su foto y su libro completo.
+*/
+export async function cambiarEstadoProducto(
+  _p: EstadoAccion,
+  datos: FormData,
+): Promise<EstadoAccion> {
+  try {
+    await requiereRol(PERMISOS.operar);
+  } catch {
+    return { error: "Tu rol no permite cambiar el estado de un producto." };
+  }
+
+  const id = texto(datos, "id");
+  const estado = texto(datos, "estado");
+
+  if (!id) return { error: "Falta el producto." };
+  /*
+    Solo estas dos transiciones. Confirmar no se hace desde el listado: exige
+    categoría y, sobre todo, exige haber mirado los datos, que es justo lo que
+    una fila de listado no permite.
+  */
+  if (estado !== "archivado" && estado !== "borrador") {
+    return { error: "Desde el listado solo se puede archivar o devolver a borrador." };
+  }
+
+  const supabase = await crearClienteServidor();
+  const { data, error } = await supabase
+    .from("productos")
+    .update({ estado })
+    .eq("id", id)
+    .select("sku");
+
+  if (error) return { error: traduce(error.code, error.message) };
+  if (!data || data.length === 0) return { error: "Ese producto ya no existe." };
+
+  const sku = (data[0] as { sku: string }).sku;
+
+  revalidatePath("/panel");
+  revalidatePath(`/panel/productos/${id}`);
+
+  return {
+    ok:
+      estado === "archivado"
+        ? `${sku} quedó archivado. Sigue en el sistema con todo su historial.`
+        : `${sku} volvió a borrador.`,
+  };
+}

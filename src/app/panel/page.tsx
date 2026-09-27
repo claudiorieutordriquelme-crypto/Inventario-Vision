@@ -9,6 +9,7 @@ import {
   procedenciaPrecio,
 } from "@/lib/formato";
 import type { EstadoProducto } from "@/lib/tipos";
+import { AccionesFila } from "./piezas-listado";
 
 /*
   Listado del inventario.
@@ -36,7 +37,17 @@ export default async function InventarioPage({
   ]);
 
   const puedeOperar = perfil ? PERMISOS.operar.includes(perfil.rol) : false;
+  const puedeAdministrar = perfil ? PERMISOS.administrar.includes(perfil.rol) : false;
   const hayFiltros = Object.values(filtros).some(Boolean);
+
+  /*
+    La exportación se lleva lo mismo que está en pantalla, así que los filtros
+    viajan en la dirección. Exportar siempre el inventario completo haría que
+    alguien filtre por borradores, exporte, y se lleve todo sin notarlo.
+  */
+  const consultaExportar = new URLSearchParams(
+    Object.entries(filtros).filter(([, v]) => Boolean(v)) as [string, string][],
+  ).toString();
 
   return (
     <div className="space-y-6">
@@ -50,14 +61,24 @@ export default async function InventarioPage({
           </p>
         </div>
 
-        {puedeOperar ? (
-          <Link
-            href="/panel/nuevo"
-            className="rounded-lg bg-primario px-4 py-2.5 text-sm font-semibold text-blanco transition-opacity hover:opacity-90"
+        <div className="flex flex-wrap gap-2">
+          {/* Enlace normal y no <Link>: la navegación de cliente de Next
+              interceptaría la respuesta y la descarga nunca empezaría. */}
+          <a
+            href={consultaExportar ? `/panel/exportar?${consultaExportar}` : "/panel/exportar"}
+            className="inline-flex items-center rounded-lg border border-gris-300 px-4 py-2.5 text-sm font-semibold text-gris-800 transition-colors hover:border-primario hover:text-primario"
           >
-            Nuevo con foto
-          </Link>
-        ) : null}
+            Exportar a Excel
+          </a>
+          {puedeOperar ? (
+            <Link
+              href="/panel/nuevo"
+              className="inline-flex items-center rounded-lg bg-primario px-4 py-2.5 text-sm font-semibold text-blanco transition-opacity hover:opacity-90"
+            >
+              Nuevo con foto
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       {/* Cuatro cifras, del mismo peso. Un número héroe solo no dice nada:
@@ -267,14 +288,11 @@ export default async function InventarioPage({
                     <p className="mt-2 text-xs text-gris-500">{precio.origen}</p>
                   ) : null}
 
-                  <div className="mt-3 text-sm font-semibold">
-                    <Link
-                      href={`/panel/productos/${p.id}`}
-                      className="text-primario hover:underline"
-                    >
-                      Ver y editar
-                    </Link>
-                  </div>
+                  <AccionesFila
+                    producto={p}
+                    puedeOperar={puedeOperar}
+                    puedeAdministrar={puedeAdministrar}
+                  />
                 </div>
               </li>
             );

@@ -5,6 +5,7 @@ import type {
   Movimiento,
   Producto,
   ProductoConCategoria,
+  ProductoListado,
 } from "@/lib/tipos";
 
 /*
@@ -55,8 +56,20 @@ export type FiltrosInventario = {
 */
 const LIMITE_LISTADO = 500;
 
-export async function listarProductos(filtros: FiltrosInventario = {}): Promise<{
-  productos: ProductoConCategoria[];
+/*
+  La exportación usa un tope mucho más alto que la pantalla. Una tabla de
+  quinientas filas ya nadie la lee de corrido, pero un archivo de cinco mil sí
+  se abre en Excel y se filtra ahí. Si alguna vez se alcanza, la exportación lo
+  declara en el nombre del archivo: un recorte silencioso hace que alguien
+  cuadre contra un total incompleto sin enterarse.
+*/
+export const LIMITE_EXPORTACION = 5000;
+
+export async function listarProductos(
+  filtros: FiltrosInventario = {},
+  limite: number = LIMITE_LISTADO,
+): Promise<{
+  productos: ProductoListado[];
   ubicaciones: string[];
   truncado: boolean;
   error: string | null;
@@ -65,9 +78,15 @@ export async function listarProductos(filtros: FiltrosInventario = {}): Promise<
 
   let consulta = supabase
     .from("productos")
-    .select("*, categorias(nombre, codigo)")
+    /*
+      El conteo de movimientos viene embebido y agregado por la base, no
+      trayendo las filas para contarlas acá. Con quinientos productos que
+      pueden tener decenas de movimientos cada uno, traerlas sería mover miles
+      de filas para calcular un número por producto.
+    */
+    .select("*, categorias(nombre, codigo), movimientos_inventario(count)")
     .order("created_at", { ascending: false })
-    .limit(LIMITE_LISTADO);
+    .limit(limite);
 
   if (filtros.categoria) consulta = consulta.eq("categoria_id", filtros.categoria);
   if (filtros.estado) consulta = consulta.eq("estado", filtros.estado);
@@ -98,15 +117,20 @@ export async function listarProductos(filtros: FiltrosInventario = {}): Promise<
   const uno = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
 
-  type Fila = Producto & { categorias: { nombre: string; codigo: string } | { nombre: string; codigo: string }[] | null };
+  type Fila = Producto & {
+    categorias: { nombre: string; codigo: string } | { nombre: string; codigo: string }[] | null;
+    movimientos_inventario: { count: number }[] | { count: number } | null;
+  };
 
   const productos = ((data ?? []) as unknown as Fila[]).map((p) => {
     const c = uno(p.categorias);
+    const conteo = uno(p.movimientos_inventario);
     return {
       ...p,
       categoria_nombre: c?.nombre ?? null,
       categoria_codigo: c?.codigo ?? null,
-    } as ProductoConCategoria;
+      movimientos: Number(conteo?.count ?? 0),
+    } as ProductoListado;
   });
 
   const ubicaciones = [
@@ -116,7 +140,7 @@ export async function listarProductos(filtros: FiltrosInventario = {}): Promise<
   return {
     productos,
     ubicaciones,
-    truncado: productos.length === LIMITE_LISTADO,
+    truncado: productos.length === limite,
     error: null,
   };
 }
