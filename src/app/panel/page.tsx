@@ -121,7 +121,7 @@ export default async function InventarioPage({
               name="buscar"
               defaultValue={filtros.buscar ?? ""}
               placeholder="Nombre o SKU"
-              className="mt-1 w-full rounded-md border border-gris-300 px-3 py-2 text-sm text-gris-900"
+              className="mt-1 w-full rounded-md border border-gris-300 px-3 py-2.5 text-sm text-gris-900"
             />
           </label>
 
@@ -132,7 +132,7 @@ export default async function InventarioPage({
             <select
               name="categoria"
               defaultValue={filtros.categoria ?? ""}
-              className="mt-1 w-full rounded-md border border-gris-300 px-3 py-2 text-sm text-gris-900"
+              className="mt-1 w-full rounded-md border border-gris-300 px-3 py-2.5 text-sm text-gris-900"
             >
               <option value="">Todas</option>
               {categorias.map((c) => (
@@ -151,7 +151,7 @@ export default async function InventarioPage({
             <select
               name="estado"
               defaultValue={filtros.estado ?? ""}
-              className="mt-1 w-full rounded-md border border-gris-300 px-3 py-2 text-sm text-gris-900"
+              className="mt-1 w-full rounded-md border border-gris-300 px-3 py-2.5 text-sm text-gris-900"
             >
               <option value="">Todos</option>
               {ESTADOS.map((e) => (
@@ -187,13 +187,37 @@ export default async function InventarioPage({
           detalle quedó en el registro del servidor.
         </p>
       ) : listado.productos.length === 0 ? (
-        <p className="rounded-lg border border-gris-200 p-6 text-base text-gris-600">
-          {hayFiltros
-            ? "Ningún producto cumple esos filtros."
-            : "Todavía no hay productos. Empieza sacándole una foto a uno."}
-        </p>
+        <div className="rounded-lg border border-gris-200 p-6">
+          <p className="text-base text-gris-600">
+            {hayFiltros
+              ? "Ningún producto cumple esos filtros."
+              : "Todavía no hay productos. Empieza sacándole una foto a uno."}
+          </p>
+          {!hayFiltros ? (
+            <div className="mt-4 flex flex-wrap gap-3">
+              {puedeOperar ? (
+                <Link
+                  href="/panel/nuevo"
+                  className="inline-flex items-center rounded-lg bg-primario px-4 py-2.5 text-sm font-semibold text-blanco transition-opacity hover:opacity-90"
+                >
+                  Cargar la primera foto
+                </Link>
+              ) : null}
+              <Link
+                href="/panel/guia"
+                className="inline-flex items-center rounded-lg border border-gris-300 px-4 py-2.5 text-sm font-semibold text-gris-800 transition-colors hover:border-primario hover:text-primario"
+              >
+                Cómo se usa
+              </Link>
+            </div>
+          ) : null}
+        </div>
       ) : (
-        <ul className="space-y-3">
+        /* Una columna en el teléfono y dos desde 1024px. Con el contenedor a
+           72rem, una sola columna deja tarjetas de casi un metro de ancho con
+           tres datos adentro, y obliga a recorrer el doble de pantalla para
+           ver la misma cantidad de productos. */
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {listado.productos.map((p) => {
             const pres = PRESENTACION_ESTADO[p.estado];
             const precio = procedenciaPrecio(p.precio_confirmado_clp, p.precio_estimado_clp);

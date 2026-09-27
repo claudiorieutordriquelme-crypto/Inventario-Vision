@@ -17,6 +17,9 @@ const SECCIONES: Seccion[] = [
   { nombre: "Nuevo con foto", ruta: "/panel/nuevo", roles: ["admin", "operador"] },
   { nombre: "Categorías", ruta: "/panel/categorias", roles: ["admin"] },
   { nombre: "Usuarios", ruta: "/panel/usuarios", roles: ["admin"] },
+  /* La guía va al final y la ve todo el mundo: es lo que hay que poder
+     encontrar cuando no entiendes qué significa una insignia. */
+  { nombre: "Guía", ruta: "/panel/guia", roles: ["admin", "operador", "lector"] },
 ];
 
 function SinAcceso({ motivo }: { motivo: string }) {
