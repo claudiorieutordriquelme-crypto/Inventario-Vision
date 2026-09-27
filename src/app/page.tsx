@@ -51,10 +51,17 @@ export default function Portada() {
       <div className="mt-10">
         <Link
           href="/login"
-          className="inline-flex items-center rounded-lg bg-primario px-6 py-3 text-base font-semibold text-blanco transition-opacity hover:opacity-90"
+          className="inline-flex w-full items-center justify-center rounded-lg bg-primario px-6 py-3.5 text-base font-semibold text-blanco transition-opacity hover:opacity-90 sm:w-auto"
         >
           Entrar
         </Link>
+        {/* La cuenta de prueba se anuncia acá pero sus credenciales NO se
+            escriben en el código: viven en la base y se imprimen en /login,
+            para poder apagarla con un UPDATE y sin desplegar. */}
+        <p className="mt-3 text-sm text-gris-600">
+          ¿Solo quieres probarla? En la pantalla de entrada hay una cuenta de
+          demostración con la que se puede mirar todo y cargar una foto.
+        </p>
       </div>
 
       <p className="mt-10 max-w-prose text-sm text-gris-500">

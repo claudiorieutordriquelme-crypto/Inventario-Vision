@@ -1,0 +1,25 @@
+-- 20260903120900_perfiles_solo_admin.sql
+-- Cierra la lectura de perfiles ajenos.
+--
+-- QUÉ ESTABA MAL. La política profiles_select_equipo dejaba que CUALQUIER
+-- sesión con permiso de lectura viera la tabla completa de perfiles: nombres,
+-- correos y roles de todo el equipo. Se escribió pensando en la pantalla de
+-- Usuarios, pero esa pantalla es solo para administradores, así que la política
+-- concedía mucho más de lo que hacía falta.
+--
+-- CÓMO SE DESCUBRIÓ. Al crear la cuenta de demostración y comprobar que podía
+-- iniciar sesión, se consultó qué veía, y devolvió también el perfil del
+-- administrador con su correo. Una cuenta cuya contraseña se publica en la
+-- pantalla de login no debería poder leer los datos de nadie más.
+--
+-- LO QUE QUEDA. Un administrador sigue viendo todo, porque profiles_admin_all
+-- se lo permite y la pantalla de Usuarios lo necesita. Cualquier otro rol ve
+-- únicamente su propia fila, que es lo que la aplicación usa para saber quién
+-- eres y qué puedes hacer.
+--
+-- SI ALGÚN DÍA HAY QUE MOSTRAR "cargado por" en un producto: no se reabre esta
+-- política. Se expone solo el nombre, por una vista o una función que devuelva
+-- ese campo y nada más. La diferencia entre publicar un nombre y publicar la
+-- tabla de usuarios es toda la diferencia.
+
+drop policy if exists profiles_select_equipo on public.profiles;
