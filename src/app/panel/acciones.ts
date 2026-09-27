@@ -419,10 +419,13 @@ export async function registrarMovimiento(
 /*
   Borrado de un producto.
 
-  La llave de movimientos_inventario hacia productos es RESTRICT, así que un
-  producto con historial no se borra por ningún camino: la base lo impide para
-  no dejar un libro apuntando al vacío. Para sacarlo de circulación está el
-  estado archivado, que conserva todo.
+  Desde la migración 20260927120000 la llave de movimientos_inventario es
+  CASCADE: borrar un producto se lleva su libro completo, en la misma
+  transacción de la base. Es una decisión tomada a conciencia y su costo está
+  escrito en esa migración: un producto borrado no deja ninguna huella.
+
+  Para sacar algo de circulación SIN perderlo sigue estando Archivado, que
+  conserva ficha, foto e historial. Es la opción que hay que preferir.
 
   Se pide escribir el SKU. No es ceremonia: obliga a mirar cuál se está
   borrando, y en un listado de quinientos productos apretar la fila equivocada
@@ -452,15 +455,7 @@ export async function eliminarProducto(_p: EstadoAccion, datos: FormData): Promi
     .eq("id", id)
     .select("sku, foto_path, foto_bucket");
 
-  if (error) {
-    if (error.code === "23503") {
-      return {
-        error:
-          "Este producto tiene movimientos registrados y la base impide borrarlo, para no perder el historial. Cámbialo a Archivado: sale de circulación y conserva su libro.",
-      };
-    }
-    return { error: traduce(error.code, error.message) };
-  }
+  if (error) return { error: traduce(error.code, error.message) };
   if (!data || data.length === 0) return { error: "Ese producto ya no existe." };
 
   /*
@@ -630,31 +625,15 @@ export async function eliminarProductos(
 
   const supabase = await crearClienteServidor();
 
-  const { data: conHistorial, error: errorMov } = await supabase
-    .from("movimientos_inventario")
-    .select("producto_id")
-    .in("producto_id", ids);
-
-  if (errorMov) {
-    console.error("No pude comprobar el historial:", errorMov.message);
-    return { error: "No pude comprobar cuáles tienen historial. No borré nada." };
-  }
-
-  const protegidos = new Set(
-    ((conHistorial ?? []) as { producto_id: string }[]).map((m) => m.producto_id),
-  );
-  const borrables = ids.filter((id) => !protegidos.has(id));
-
-  if (borrables.length === 0) {
-    return {
-      error: `Ninguno de los ${ids.length} seleccionados se puede borrar: todos tienen movimientos. Archívalos.`,
-    };
-  }
-
+  /*
+    Ya no se separa entre borrables y protegidos. La llave de
+    movimientos_inventario pasó a CASCADE, así que un solo DELETE se lleva los
+    productos y sus libros en la misma transacción de la base.
+  */
   const { data, error } = await supabase
     .from("productos")
     .delete()
-    .in("id", borrables)
+    .in("id", ids)
     .select("sku, foto_path, foto_bucket");
 
   if (error) return { error: traduce(error.code, error.message) };
@@ -669,11 +648,12 @@ export async function eliminarProductos(
 
   revalidatePath("/panel");
 
-  const partes = [`${borrados.length} ${borrados.length === 1 ? "producto borrado" : "productos borrados"}`];
-  if (protegidos.size > 0) {
-    partes.push(`${protegidos.size} con movimientos que no se pueden borrar`);
-  }
-  const noEncontrados = borrables.length - borrados.length;
+  const partes = [
+    `${borrados.length} ${borrados.length === 1 ? "producto borrado" : "productos borrados"}`,
+  ];
+  /* La diferencia se declara: si se pidieron doce y se fueron diez, decir
+     "listo" esconde que dos ya no estaban. */
+  const noEncontrados = ids.length - borrados.length;
   if (noEncontrados > 0) partes.push(`${noEncontrados} que ya no existían`);
 
   return { ok: `${partes.join(", ")}.`, hechos: borrados.length };

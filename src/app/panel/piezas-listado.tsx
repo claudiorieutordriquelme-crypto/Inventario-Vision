@@ -31,14 +31,15 @@ import type { ProductoListado } from "@/lib/tipos";
 
   ── LA REGLA QUE MANDA EN EL BORRADO ───────────────────────────────────────
 
-  La llave de movimientos_inventario hacia productos es RESTRICT: un producto
-  con aunque sea un movimiento NO se borra, la base lo rechaza. Y el alta por
-  foto deja un conteo inicial, así que la mayoría cae en ese caso.
+  Desde la migración 20260927120000 la llave de movimientos_inventario es
+  CASCADE: borrar un producto se lleva su libro completo. Antes era RESTRICT y
+  dejaba 8 de cada 9 productos imposibles de borrar, porque el alta por foto
+  les deja un conteo inicial.
 
-  De ahí que la fila no ofrezca "Borrar" cuando la base lo va a rechazar, y que
-  el borrado masivo diga cuántos de los seleccionados quedaron fuera. Mostrar
-  un botón que falla casi siempre enseña que la aplicación se equivoca, en vez
-  de enseñar cómo funciona el inventario.
+  Como ahora todo se puede borrar y el borrado arrastra historial, la interfaz
+  tiene una sola obligación: decir CUÁNTO se lleva antes de que alguien
+  confirme, tanto en una fila como en una selección de treinta. Un borrado que
+  no declara lo que arrastra es una trampa.
 
   ── POR QUÉ LA PREVISUALIZACIÓN USA <dialog> ───────────────────────────────
 
@@ -253,7 +254,6 @@ function AccionesFila({
   const [confirmando, setConfirmando] = useState(false);
 
   const archivado = producto.estado === "archivado";
-  const borrable = producto.movimientos === 0;
 
   return (
     <div className="mt-3 border-t border-gris-100 pt-3">
@@ -277,37 +277,37 @@ function AccionesFila({
         ) : null}
 
         {puedeAdministrar ? (
-          borrable ? (
-            <button
-              type="button"
-              onClick={() => setConfirmando((v) => !v)}
-              aria-expanded={confirmando}
-              className="text-acento transition-opacity hover:opacity-80"
-            >
-              {confirmando ? "Cancelar" : "Borrar"}
-            </button>
-          ) : (
-            /* No es un botón deshabilitado: un control apagado sin explicación
-               se lee como una falla de la aplicación. */
-            <span className="font-normal text-gris-500">
-              No se puede borrar: tiene {producto.movimientos}{" "}
-              {producto.movimientos === 1 ? "movimiento" : "movimientos"}. Archívalo.
-            </span>
-          )
+          <button
+            type="button"
+            onClick={() => setConfirmando((v) => !v)}
+            aria-expanded={confirmando}
+            className="text-acento transition-opacity hover:opacity-80"
+          >
+            {confirmando ? "Cancelar" : "Borrar"}
+          </button>
         ) : null}
       </div>
 
       <Mensaje estado={estadoCambio} />
 
-      {confirmando && borrable ? (
+      {confirmando ? (
         <form action={accionBorrar} className="mt-3 rounded-lg border border-acento p-3">
           <input type="hidden" name="id" value={producto.id} />
           <input type="hidden" name="sku_esperado" value={producto.sku} />
 
           <p className="text-sm text-gris-700">
-            Se borra el producto y su SKU, que no se reutiliza. La foto solo se
-            borra si ningún otro producto la está usando. No hay forma de
-            deshacerlo.
+            Se borra el producto y su SKU, que no se reutiliza
+            {producto.movimientos > 0 ? (
+              <>
+                , junto con sus{" "}
+                <strong className="font-semibold text-gris-900">
+                  {producto.movimientos}{" "}
+                  {producto.movimientos === 1 ? "movimiento" : "movimientos"}
+                </strong>
+              </>
+            ) : null}
+            . La foto solo se borra si ningún otro producto la está usando. No
+            hay forma de deshacerlo.
           </p>
 
           <label className="mt-2.5 block max-w-xs">
@@ -384,9 +384,10 @@ function BarraMasiva({
     lo borrado deja de estar seleccionado solo.
   */
 
-  const borrables = seleccionados.filter((p) => p.movimientos === 0);
-  const protegidos = seleccionados.length - borrables.length;
   const n = seleccionados.length;
+  /* Cuántos movimientos se van con la selección. Es el dato que la persona
+     necesita antes de confirmar, y el que la base va a borrar en cascada. */
+  const movimientos = seleccionados.reduce((t, p) => t + p.movimientos, 0);
 
   return (
     <div className="sticky bottom-0 z-10 -mx-4 border-t border-gris-300 bg-blanco/95 px-4 py-3 backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:px-4 sm:shadow-elevada">
@@ -441,38 +442,38 @@ function BarraMasiva({
               type="button"
               onClick={() => setConfirmando((v) => !v)}
               aria-expanded={confirmando}
-              disabled={borrables.length === 0}
+              disabled={n === 0}
               className="rounded-lg border border-acento px-4 py-2.5 text-sm font-semibold text-gris-900 transition-colors hover:bg-acento hover:text-negro disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-gris-900"
             >
-              {confirmando ? "Cancelar" : `Borrar (${borrables.length})`}
+              {confirmando ? "Cancelar" : `Borrar (${n})`}
             </button>
           ) : null}
         </div>
       </div>
 
-      {/* Cuando la selección mezcla borrables y protegidos, se dice antes de
-          apretar nada. Enterarse después de confirmar es enterarse tarde. */}
-      {puedeAdministrar && protegidos > 0 ? (
+      {/* El arrastre se dice antes de apretar nada. Enterarse después de
+          confirmar de que se fueron treinta movimientos es enterarse tarde. */}
+      {puedeAdministrar && movimientos > 0 ? (
         <p className="mt-2 text-sm text-gris-600">
-          {protegidos} de los {n} tienen movimientos y no se pueden borrar. Para
-          esos, usa Archivar.
+          Borrarlos se lleva también {movimientos}{" "}
+          {movimientos === 1 ? "movimiento" : "movimientos"} de historial. Si
+          solo quieres sacarlos de circulación, usa Archivar.
         </p>
       ) : null}
 
-      {confirmando && borrables.length > 0 ? (
+      {confirmando && n > 0 ? (
         <form action={accionBorrar} className="mt-3 rounded-lg border border-acento p-3">
-          {borrables.map((p) => (
+          {seleccionados.map((p) => (
             <input key={p.id} type="hidden" name="ids" value={p.id} />
           ))}
 
           <p className="text-sm font-bold text-gris-900">
-            Se van a borrar {borrables.length}{" "}
-            {borrables.length === 1 ? "producto" : "productos"}:
+            Se van a borrar {n} {n === 1 ? "producto" : "productos"}:
           </p>
           {/* Los SKU van a la vista. Confirmar una cantidad sin ver cuáles es
               confirmar a ciegas. */}
           <p className="mt-1 max-h-24 overflow-y-auto font-mono text-sm text-gris-700">
-            {borrables.map((p) => p.sku).join(", ")}
+            {seleccionados.map((p) => p.sku).join(", ")}
           </p>
           <p className="mt-2 text-sm text-gris-600">
             Se van sus SKU, que no se reutilizan, y las fotos que no esté usando
@@ -500,7 +501,7 @@ function BarraMasiva({
               disabled={borrando}
               className="rounded-md bg-acento px-4 py-2.5 text-sm font-semibold text-negro transition-opacity hover:opacity-90 disabled:opacity-60"
             >
-              {borrando ? "Borrando..." : `Borrar ${borrables.length} definitivamente`}
+              {borrando ? "Borrando..." : `Borrar ${n} definitivamente`}
             </button>
             <button
               type="button"

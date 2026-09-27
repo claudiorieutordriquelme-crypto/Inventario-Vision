@@ -16,18 +16,31 @@ export const dynamic = "force-dynamic";
 /*
   Manual de uso, dentro de la aplicación.
 
-  POR QUÉ ACÁ Y NO EN UN PDF O EN UNA PÁGINA APARTE. Un manual que vive fuera
-  de la herramienta envejece sin que nadie lo note. Este importa las mismas
-  constantes que usa la interfaz: las insignias de estado se dibujan con
-  PRESENTACION_ESTADO, los roles salen de ROLES, el tope de productos por foto
-  sale de lib/vision. Si alguien cambia un estado, agrega un rol o sube el
-  tope, esta página cambia sola. Un texto escrito a mano habría quedado
-  mintiendo en el primer cambio.
+  ── POR QUÉ VIVE ACÁ Y NO EN UN DOCUMENTO APARTE ───────────────────────────
 
-  LO QUE NO SE PUEDE DERIVAR DEL CÓDIGO va escrito y con su porqué: de dónde
-  sale el precio, por qué hay dos, por qué el libro de movimientos no se edita.
-  Eso es justamente lo que la gente no puede deducir mirando la pantalla, y es
-  donde se cometen los errores caros.
+  Un manual que vive fuera de la herramienta envejece sin que nadie lo note.
+  Este importa las mismas constantes que usa la interfaz: las insignias se
+  dibujan con PRESENTACION_ESTADO, los roles salen de ROLES y DESCRIPCION_ROL,
+  el tope de productos por foto sale de lib/vision. Si alguien agrega un
+  estado, cambia una descripción de rol o sube el tope, esta página cambia
+  sola.
+
+  Lo que NO se puede derivar del código va escrito, con su porqué: de dónde
+  sale el precio, por qué hay dos, qué arrastra un borrado. Eso es lo que nadie
+  puede deducir mirando la pantalla, y donde se cometen los errores caros.
+
+  ── REGISTRO ───────────────────────────────────────────────────────────────
+
+  Redacción impersonal y formal, sin tuteo y sin expresiones coloquiales. El
+  resto de la aplicación todavía usa segunda persona informal ("Saca la foto");
+  si se decide unificar, este archivo marca el registro de destino.
+
+  ── DISEÑO ─────────────────────────────────────────────────────────────────
+
+  Dos columnas desde 1024 px con el índice fijo a la izquierda, que es el
+  patrón de documentación que la gente ya sabe leer. Bajo ese ancho, el índice
+  pasa arriba como fila de fichas. El cuerpo se limita a 65 caracteres por
+  línea: más ancho que eso, el ojo pierde el renglón al volver.
 */
 
 const ESTADOS: EstadoProducto[] = ["borrador", "confirmado", "archivado"];
@@ -35,88 +48,131 @@ const MOVIMIENTOS: TipoMovimiento[] = ["ingreso", "salida", "ajuste"];
 
 const QUE_HACER: Record<EstadoProducto, string> = {
   borrador:
-    "Ábrelo, corrige lo que esté mal, fija el precio si lo sabes y márcalo como confirmado.",
-  confirmado: "Nada, salvo que cambie algo. La valorización del inventario cuenta con él.",
-  archivado:
-    "Nada. Deja de sumar a la valorización, pero su ficha y su historial siguen ahí.",
+    "Revisar los datos, corregir lo que corresponda, fijar el precio si se conoce y confirmar.",
+  confirmado: "Nada, salvo que cambie algo. La valorización del inventario lo considera.",
+  archivado: "Nada. Deja de sumar a la valorización y conserva su ficha y su historial.",
 };
 
 const PASOS = [
   {
-    titulo: "Saca la foto",
+    titulo: "Tomar la fotografía",
     cuerpo:
-      "Desde el teléfono puedes usar la cámara sin salir de la página, mirar cómo quedó y repetirla si salió movida. Desde un computador, subes un archivo. Apoya las cosas sobre una superficie despejada y apunta de frente: una foto clara ahorra la mitad de las correcciones.",
+      "Desde un teléfono, la cámara se abre dentro de la aplicación: permite revisar la toma y repetirla si salió desenfocada. Desde un computador, se sube un archivo. Conviene apoyar los productos sobre una superficie despejada y fotografiar de frente.",
+    dato: "Una fotografía nítida reduce a la mitad las correcciones posteriores.",
   },
   {
-    titulo: "Revisa lo que encontró",
+    titulo: "Revisar lo identificado",
     cuerpo:
-      "Al terminar el análisis ves la lista de lo que identificó, con la ubicación de cada producto dentro de la imagen descrita en palabras, para que sepas cuál es cuál. Nada de eso es definitivo.",
+      "Al terminar el análisis se presenta la lista de productos detectados, cada uno con su ubicación dentro de la imagen descrita en palabras. Nada de eso es definitivo.",
+    dato: "Todo queda en estado Borrador hasta que una persona lo revise.",
   },
   {
-    titulo: "Corrige y confirma",
+    titulo: "Corregir y confirmar",
     cuerpo:
-      "Abre cada ficha, arregla el nombre, la categoría y el precio, y cámbiale el estado a confirmado. Confirmar significa que una persona se hace cargo de esos datos.",
+      "En la ficha de cada producto se ajusta el nombre, la categoría y el precio, y se cambia el estado a Confirmado. Confirmar significa que una persona se hace responsable de esos datos.",
+    dato: "Confirmar exige asignar una categoría.",
   },
   {
-    titulo: "Registra lo que entra y lo que sale",
+    titulo: "Registrar entradas y salidas",
     cuerpo:
-      "Cuando llega mercadería o se consume algo, lo anotas como movimiento en la ficha del producto. La cantidad no se escribe a mano: sale de sumar esos movimientos.",
+      "Cuando llega mercadería o se consume un producto, se anota como movimiento en su ficha. La cantidad no se escribe a mano: resulta de la suma de esos movimientos.",
+    dato: "El libro de movimientos no se edita ni se borra por separado.",
   },
 ];
 
 const PROBLEMAS = [
   {
-    q: "Identificó mal un producto, o se inventó uno que no está",
-    a: "Corrige la ficha, o archívala si no corresponde a nada. El análisis propone, no decide. Si pasa seguido, casi siempre es la foto: poco contraste con la mesa, cosas encimadas o demasiado lejos.",
+    q: "El análisis identificó mal un producto, o detectó uno inexistente",
+    a: "Corresponde corregir la ficha, o archivarla si no representa nada real. El análisis propone, no decide. Cuando ocurre con frecuencia, la causa suele estar en la fotografía: poco contraste con la superficie, productos superpuestos o tomados a demasiada distancia.",
   },
   {
-    q: "Dejó productos sin categoría",
-    a: "El análisis elige entre las categorías que existan, y si ninguna calza deja el producto sin clasificar en vez de inventar una. Un administrador puede crear la que falta y después la asignas en la ficha.",
+    q: "Quedaron productos sin categoría",
+    a: "El análisis elige entre las categorías existentes y, cuando ninguna corresponde, deja el producto sin clasificar en lugar de inventar una. Un administrador puede crear la categoría faltante y luego asignarla desde la ficha.",
   },
   {
-    q: "El precio se ve disparatado",
-    a: "Es lo esperable en productos poco comunes, de nicho o con mucha variación de marca. Fija el precio confirmado y el estimado queda al lado para comparar.",
+    q: "El precio estimado parece muy alejado de la realidad",
+    a: "Es lo esperable en productos poco comunes, de nicho o con alta variación entre marcas. Corresponde fijar el precio confirmado; la estimación se conserva al lado para efectos de comparación.",
   },
   {
-    q: "La cámara no abre",
-    a: "El navegador pide permiso la primera vez; si lo rechazaste, se cambia desde el candado de la barra de direcciones. En un computador sin cámara no va a aparecer nunca: sube la foto como archivo.",
+    q: "La cámara no se abre",
+    a: "El navegador solicita permiso la primera vez. Si se rechazó, se modifica desde el candado de la barra de direcciones. En un computador sin cámara la opción no estará disponible: corresponde subir la fotografía como archivo.",
   },
   {
-    q: "La cantidad no cuadra con la bodega",
-    a: "No la edites, no se puede. Anota un ajuste con la diferencia y escribe el motivo. Así el número queda correcto y además queda registrado que hubo un descuadre.",
+    q: "La cantidad no coincide con lo que hay en bodega",
+    a: "La cantidad no se edita. Corresponde registrar un movimiento de tipo Ajuste con la diferencia y escribir el motivo. Así el número queda correcto y además queda constancia de que hubo un descuadre.",
   },
 ];
 
 const SECCIONES = [
-  { id: "como-funciona", titulo: "Cómo funciona" },
-  { id: "paso-a-paso", titulo: "Paso a paso" },
-  { id: "estados", titulo: "Los estados" },
+  { id: "resumen", titulo: "En 30 segundos" },
+  { id: "paso-a-paso", titulo: "El flujo, paso a paso" },
+  { id: "estados", titulo: "Los tres estados" },
   { id: "precios", titulo: "Los dos precios" },
   { id: "cantidad", titulo: "Cantidad y movimientos" },
-  { id: "sku", titulo: "El SKU" },
-  { id: "sacar", titulo: "Borrar, archivar y exportar" },
-  { id: "roles", titulo: "Los roles" },
-  { id: "problemas", titulo: "Cuando algo sale mal" },
+  { id: "sku", titulo: "El código SKU" },
+  { id: "salir", titulo: "Archivar, borrar y exportar" },
+  { id: "roles", titulo: "Permisos por rol" },
+  { id: "problemas", titulo: "Situaciones frecuentes" },
 ];
 
-function Titulo({ id, children }: { id: string; children: React.ReactNode }) {
-  /* scroll-mt deja el título bajo el encabezado pegajoso al saltar desde el
-     índice; sin eso, el ancla aterriza tapada por la barra negra. */
+function Seccion({
+  id,
+  titulo,
+  bajada,
+  children,
+}: {
+  id: string;
+  titulo: string;
+  bajada?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <h2 id={id} className="scroll-mt-32 text-xl font-bold text-gris-900">
-      {children}
-    </h2>
+    /* scroll-mt deja el título bajo el encabezado pegajoso al saltar desde el
+       índice; sin eso, el ancla aterriza tapada por la barra negra. */
+    <section id={id} className="scroll-mt-32 border-t border-gris-200 pt-8">
+      <h2 className="text-xl font-bold text-gris-900 sm:text-2xl">{titulo}</h2>
+      {bajada ? <p className="mt-1.5 max-w-[65ch] text-base text-gris-600">{bajada}</p> : null}
+      <div className="mt-5 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function Ficha({
+  titulo,
+  children,
+  destacada = false,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+  destacada?: boolean;
+}) {
+  if (destacada) {
+    return (
+      <div className="flex overflow-hidden rounded-xl border border-gris-200">
+        <div className="w-1.5 shrink-0 bg-marca" aria-hidden="true" />
+        <div className="min-w-0 flex-1 p-4 sm:p-5">
+          <h3 className="text-base font-bold text-gris-900">{titulo}</h3>
+          <div className="mt-1.5 max-w-[65ch] text-base text-gris-600">{children}</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-xl border border-gris-200 p-4 sm:p-5">
+      <h3 className="text-base font-bold text-gris-900">{titulo}</h3>
+      <div className="mt-1.5 text-base text-gris-600">{children}</div>
+    </div>
   );
 }
 
 function describeMovimiento(tipo: TipoMovimiento): string {
   if (tipo === "ingreso") {
-    return "Entra mercadería. Suma. El alta de un producto con foto deja un ingreso inicial.";
+    return "Llega mercadería. Suma. El alta de un producto por fotografía deja un ingreso inicial.";
   }
   if (tipo === "salida") {
-    return "Se consume, se vende o se presta. Resta.";
+    return "El producto se consume, se vende o se presta. Resta.";
   }
-  return "Corrige una diferencia contra lo que hay realmente en la bodega. Puede sumar o restar.";
+  return "Corrige una diferencia respecto de lo que hay realmente en bodega. Puede sumar o restar.";
 }
 
 export default async function GuiaPage() {
@@ -126,349 +182,344 @@ export default async function GuiaPage() {
   const puedeOperar = miRol ? PERMISOS.operar.includes(miRol) : false;
 
   return (
-    <div className="space-y-10">
-      <header>
-        <p className="text-xs font-bold tracking-widest text-primario uppercase">Guía</p>
-        <h1 className="mt-1 text-2xl font-bold text-gris-900 sm:text-3xl">
-          Cómo se usa esta herramienta
-        </h1>
-        <p className="mt-2 max-w-prose text-base text-gris-600">
-          Léela una vez y no vuelves más. Lo único que de verdad hay que
-          entender es{" "}
-          <a href="#precios" className="font-semibold text-primario hover:underline">
-            de dónde sale el precio
-          </a>
-          , porque es el dato con el que alguien puede tomar una mala decisión
-          creyendo que es firme.
-        </p>
+    <div className="lg:flex lg:gap-10">
+      {/*
+        Índice. En pantalla ancha queda fijo a la izquierda mientras el
+        contenido se desplaza; en pantalla chica se convierte en una fila de
+        fichas arriba. Sin índice, esta página obliga a recorrerla a ciegas.
+      */}
+      <nav
+        aria-label="Contenido de la guía"
+        className="mb-8 lg:sticky lg:top-32 lg:mb-0 lg:h-fit lg:w-56 lg:shrink-0"
+      >
+        <p className="text-xs font-bold tracking-widest text-gris-500 uppercase">Contenido</p>
+        <ul className="mt-3 flex flex-wrap gap-2 lg:flex-col lg:gap-0.5">
+          {SECCIONES.map((s) => (
+            <li key={s.id}>
+              <a
+                href={`#${s.id}`}
+                className="inline-flex rounded-lg border border-gris-300 px-3 py-2 text-sm font-semibold text-gris-700 transition-colors hover:border-primario hover:text-primario lg:w-full lg:border-0 lg:border-l-2 lg:border-gris-200 lg:px-3 lg:py-1.5 lg:hover:border-primario lg:hover:bg-gris-50"
+              >
+                {s.titulo}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
-        {/* Índice. En una pantalla chica esta página es larga, y sin esto hay
-            que deslizar a ciegas para encontrar una cosa. */}
-        <nav aria-label="Contenido de la guía" className="mt-5">
-          <ul className="flex flex-wrap gap-2">
-            {SECCIONES.map((s) => (
-              <li key={s.id}>
-                <a
-                  href={`#${s.id}`}
-                  className="inline-flex items-center rounded-lg border border-gris-300 px-3 py-2 text-sm font-semibold text-gris-800 transition-colors hover:border-primario hover:text-primario"
-                >
-                  {s.titulo}
-                </a>
+      <div className="min-w-0 flex-1 space-y-10">
+        <header>
+          <p className="text-xs font-bold tracking-widest text-primario uppercase">Guía de uso</p>
+          <h1 className="mt-1.5 text-3xl font-bold text-gris-900 sm:text-4xl">
+            Cómo funciona el inventario
+          </h1>
+          <p className="mt-3 max-w-[65ch] text-lg text-gris-600">
+            Esta guía explica el flujo completo, qué significa cada estado y qué
+            puede hacer cada rol. Basta leerla una vez.
+          </p>
+        </header>
+
+        <section id="resumen" className="scroll-mt-32">
+          <h2 className="sr-only">En 30 segundos</h2>
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              {
+                n: "01",
+                t: "Una foto, varios productos",
+                d: `En una misma imagen se identifican hasta ${MAXIMO_POR_FOTO} productos distintos y se crea una ficha por cada uno.`,
+              },
+              {
+                n: "02",
+                t: "Nada entra confirmado",
+                d: "Todo lo que propone el análisis queda en Borrador hasta que una persona lo revisa.",
+              },
+              {
+                n: "03",
+                t: "El precio es una estimación",
+                d: "No proviene de consultar la web. Sirve como orden de magnitud, no para cotizar.",
+              },
+            ].map((c) => (
+              <li key={c.n} className="rounded-xl border border-gris-200 p-4 sm:p-5">
+                <span className="font-mono text-sm font-bold text-primario">{c.n}</span>
+                <h3 className="mt-1 text-base font-bold text-gris-900">{c.t}</h3>
+                <p className="mt-1.5 text-sm text-gris-600">{c.d}</p>
               </li>
             ))}
           </ul>
-        </nav>
-      </header>
 
-      <section className="space-y-3 border-t border-gris-200 pt-7">
-        <Titulo id="como-funciona">Cómo funciona</Titulo>
-        <p className="max-w-prose text-base text-gris-600">
-          Le sacas una foto a lo que tienes y el sistema identifica cada
-          producto que aparece, lo clasifica en una de tus categorías, le pone
-          un SKU, escribe una descripción breve y propone un precio en pesos
-          chilenos. Todo eso queda en{" "}
-          <strong className="font-semibold text-gris-900">borrador</strong> hasta
-          que una persona lo revisa.
-        </p>
-        <p className="max-w-prose text-base text-gris-600">
-          En una misma foto pueden salir hasta {MAXIMO_POR_FOTO} productos
-          distintos, y se crea una ficha por cada uno. Varias unidades del{" "}
-          <em>mismo</em> producto no son varios productos: eso es cantidad.{" "}
-          <span className="text-gris-800">
-            Un martillo, un alicate y un destornillador sobre la mesa son tres
-            fichas; tres martillos iguales son una ficha con cantidad 3.
-          </span>
-        </p>
+          {!disponible ? (
+            <div className="mt-4 flex overflow-hidden rounded-xl border border-gris-200">
+              <div className="w-1.5 shrink-0 bg-marca" aria-hidden="true" />
+              <p className="max-w-[65ch] p-4 text-base text-gris-600">
+                <strong className="font-semibold text-gris-900">
+                  El análisis automático no está configurado en este momento.
+                </strong>{" "}
+                La fotografía se guarda y el producto se crea, pero sin datos:
+                corresponde escribirlos a mano en la ficha. El resto de la guía
+                aplica igual.
+              </p>
+            </div>
+          ) : null}
+        </section>
 
-        {!disponible ? (
-          <div className="flex overflow-hidden rounded-lg border border-gris-200">
-            <div className="w-2 shrink-0 bg-marca" aria-hidden="true" />
-            <p className="p-4 text-sm text-gris-600">
-              <strong className="font-semibold text-gris-900">
-                Ahora mismo el análisis automático no está configurado
-              </strong>
-              , así que la foto se guarda y el producto se crea, pero vacío: los
-              datos hay que escribirlos a mano en la ficha. Todo lo demás de
-              esta guía funciona igual.
-            </p>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="space-y-4 border-t border-gris-200 pt-7">
-        <Titulo id="paso-a-paso">Paso a paso</Titulo>
-
-        <ol className="space-y-4">
-          {PASOS.map((paso, i) => (
-            <li key={paso.titulo} className="flex gap-4">
-              <span
-                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-marca text-sm font-bold text-negro"
-                aria-hidden="true"
-              >
-                {i + 1}
-              </span>
-              <div className="min-w-0">
-                <h3 className="text-base font-bold text-gris-900">
-                  <span className="sr-only">Paso {i + 1}: </span>
-                  {paso.titulo}
-                </h3>
-                <p className="mt-1 max-w-prose text-sm text-gris-600">{paso.cuerpo}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-
-        {puedeOperar ? (
-          <Link
-            href="/panel/nuevo"
-            className="inline-flex items-center rounded-lg bg-primario px-5 py-3 text-base font-semibold text-blanco transition-opacity hover:opacity-90"
-          >
-            Probar ahora con una foto
-          </Link>
-        ) : (
-          <p className="text-sm text-gris-500">
-            Tu cuenta es de solo lectura, así que los pasos 1, 3 y 4 los hace
-            alguien con permiso de carga.
-          </p>
-        )}
-      </section>
-
-      <section className="space-y-4 border-t border-gris-200 pt-7">
-        <Titulo id="estados">Qué significa cada estado</Titulo>
-        <p className="max-w-prose text-base text-gris-600">
-          Todo producto está en uno de tres estados. La insignia que ves acá es
-          exactamente la que aparece en el listado y en la ficha.
-        </p>
-
-        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-          {ESTADOS.map((e) => {
-            const pres = PRESENTACION_ESTADO[e];
-            return (
-              <li key={e} className="flex overflow-hidden rounded-lg border border-gris-200">
-                <div className={`w-2 shrink-0 ${pres.barra}`} aria-hidden="true" />
-                <div className="min-w-0 flex-1 p-4">
-                  <span
-                    className={`inline-flex rounded px-2 py-1 text-xs font-bold tracking-wide uppercase ${pres.insignia}`}
-                  >
-                    {pres.etiqueta}
-                  </span>
-                  <p className="mt-2.5 text-sm text-gris-600">{pres.explica}</p>
-                  <p className="mt-2 text-sm">
-                    <span className="font-semibold text-gris-900">Qué hacer: </span>
-                    <span className="text-gris-600">{QUE_HACER[e]}</span>
-                  </p>
+        <Seccion
+          id="paso-a-paso"
+          titulo="El flujo, paso a paso"
+          bajada="Cuatro pasos, de la bodega a un inventario confirmado."
+        >
+          <ol className="space-y-3">
+            {PASOS.map((paso, i) => (
+              <li key={paso.titulo} className="flex gap-4 rounded-xl border border-gris-200 p-4 sm:p-5">
+                <span
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full bg-marca text-base font-bold text-negro"
+                  aria-hidden="true"
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-gris-900">
+                    <span className="sr-only">Paso {i + 1}: </span>
+                    {paso.titulo}
+                  </h3>
+                  <p className="mt-1.5 max-w-[65ch] text-base text-gris-600">{paso.cuerpo}</p>
+                  <p className="mt-2 text-sm font-semibold text-primario">{paso.dato}</p>
                 </div>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ol>
 
-        <p className="max-w-prose text-sm text-gris-500">
-          El estado nunca se comunica solo con el color: la palabra va siempre
-          escrita al lado. En una bodega con la pantalla a contraluz, o para
-          quien no distingue esos tonos, el color por sí solo no se lee.
-        </p>
-      </section>
+          {puedeOperar ? (
+            <Link
+              href="/panel/nuevo"
+              className="inline-flex items-center rounded-lg bg-primario px-5 py-3 text-base font-semibold text-blanco transition-opacity hover:opacity-90"
+            >
+              Cargar una fotografía
+            </Link>
+          ) : (
+            <p className="text-sm text-gris-500">
+              Esta cuenta es de solo lectura. Los pasos 1, 3 y 4 los ejecuta una
+              cuenta con permiso de carga.
+            </p>
+          )}
+        </Seccion>
 
-      <section className="space-y-4 border-t border-gris-200 pt-7">
-        <Titulo id="precios">Los dos precios</Titulo>
-
-        {/* La sección más importante de la guía, y por eso va destacada. */}
-        <div className="flex overflow-hidden rounded-lg border border-gris-200">
-          <div className="w-2 shrink-0 bg-marca" aria-hidden="true" />
-          <p className="max-w-prose p-4 text-base text-gris-700">
-            <strong className="font-semibold text-gris-900">
-              El precio estimado no viene de buscar en internet.
-            </strong>{" "}
-            Sale del conocimiento del modelo que mira la foto, y ese
-            conocimiento tiene fecha de corte. Sirve para tener un orden de
-            magnitud mientras nadie lo ha revisado. No sirve para cotizar, para
-            cobrar ni para decidir una compra.
-          </p>
-        </div>
-
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-gris-200 p-4">
-            <dt className="text-sm font-bold text-gris-900">Precio estimado</dt>
-            <dd className="mt-1.5 text-sm text-gris-600">
-              Lo propone el análisis de la foto. Nunca lo sobrescribe una
-              persona: se conserva aunque fijes otro, porque es la única forma
-              de ver cuánto se equivoca el modelo y calibrar cuánto confiar en
-              él la próxima vez.
-            </dd>
-          </div>
-          <div className="rounded-lg border border-gris-200 p-4">
-            <dt className="text-sm font-bold text-gris-900">Precio confirmado</dt>
-            <dd className="mt-1.5 text-sm text-gris-600">
-              Lo escribes tú, con una factura, una cotización o lo que
-              corresponda a la vista. Manda sobre el estimado: en cuanto existe,
-              es el que se usa para valorizar el inventario.
-            </dd>
-          </div>
-        </dl>
-
-        <p className="max-w-prose text-base text-gris-600">
-          En el listado y en la ficha siempre dice de dónde salió el número que
-          estás mirando:{" "}
-          <span className="font-semibold text-gris-800">
-            &quot;Estimación del modelo, sin consultar la web&quot;
-          </span>{" "}
-          o{" "}
-          <span className="font-semibold text-gris-800">&quot;Fijado por una persona&quot;</span>.
-          La cifra de <strong className="font-semibold text-gris-900">Valorización</strong> de
-          la portada mezcla las dos, y por eso al lado va el contador de cuántos
-          productos siguen con precio solo estimado: sin ese contador, una
-          valorización hecha de puras estimaciones se ve igual de firme que una
-          revisada.
-        </p>
-      </section>
-
-      <section className="space-y-4 border-t border-gris-200 pt-7">
-        <Titulo id="cantidad">Cantidad y movimientos</Titulo>
-        <p className="max-w-prose text-base text-gris-600">
-          La cantidad de un producto{" "}
-          <strong className="font-semibold text-gris-900">no se edita</strong>. Es la suma de su
-          libro de movimientos, y se recalcula sola cada vez que anotas uno.
-        </p>
-
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {MOVIMIENTOS.map((t) => (
-            <div key={t} className="rounded-lg border border-gris-200 p-4">
-              <dt className="text-sm font-bold text-gris-900">{ETIQUETA_MOVIMIENTO[t]}</dt>
-              <dd className="mt-1.5 text-sm text-gris-600">{describeMovimiento(t)}</dd>
-            </div>
-          ))}
-        </dl>
-
-        <p className="max-w-prose text-base text-gris-600">
-          <strong className="font-semibold text-gris-900">
-            El libro no se edita ni se borra
-          </strong>
-          , ni siquiera desde una cuenta de administrador. Si te equivocaste en
-          un movimiento, anotas un ajuste que lo compense y quedan los dos a la
-          vista. Un inventario en el que se puede reescribir el pasado no sirve
-          para cuadrar contra una bodega real: cada vez que el número no calza,
-          la explicación tiene que estar en alguna parte.
-        </p>
-      </section>
-
-      <section className="space-y-3 border-t border-gris-200 pt-7">
-        <Titulo id="sku">El SKU</Titulo>
-        <p className="max-w-prose text-base text-gris-600">
-          Cada producto recibe un código único al crearse, con el prefijo de su
-          categoría y un correlativo. Lo genera la base de datos y no la
-          pantalla, así que dos personas cargando fotos al mismo tiempo desde
-          dos teléfonos nunca reciben el mismo número.
-        </p>
-        <p className="max-w-prose text-base text-gris-600">
-          Es el identificador para buscar: el buscador del inventario lo acepta
-          igual que el nombre.
-        </p>
-      </section>
-
-      <section className="space-y-4 border-t border-gris-200 pt-7">
-        <Titulo id="sacar">Sacar un producto del inventario, y llevarte los datos</Titulo>
-
-        <p className="max-w-prose text-base text-gris-600">
-          En el listado, cada producto tiene sus acciones debajo. Hay dos
-          formas de sacarlo de circulación y no son intercambiables.
-        </p>
-
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-gris-200 p-4">
-            <dt className="text-sm font-bold text-gris-900">Archivar</dt>
-            <dd className="mt-1.5 text-sm text-gris-600">
-              Es lo que vas a usar casi siempre. Deja de contarse en las
-              unidades y en la valorización, pero conserva su ficha, su foto y
-              su libro completo. Se puede restaurar desde el mismo listado.
-            </dd>
-          </div>
-          <div className="rounded-lg border border-gris-200 p-4">
-            <dt className="text-sm font-bold text-gris-900">Borrar</dt>
-            <dd className="mt-1.5 text-sm text-gris-600">
-              Desaparece el producto, su foto y su SKU, que no se reutiliza. No
-              se puede deshacer. Solo lo ve un administrador, y hay que escribir
-              el SKU para confirmar.
-            </dd>
-          </div>
-        </dl>
-
-        <div className="flex overflow-hidden rounded-lg border border-gris-200">
-          <div className="w-2 shrink-0 bg-marca" aria-hidden="true" />
-          <p className="max-w-prose p-4 text-base text-gris-700">
-            <strong className="font-semibold text-gris-900">
-              Un producto con movimientos no se puede borrar.
-            </strong>{" "}
-            No es una restricción de la pantalla, es la base de datos: borrarlo
-            dejaría el libro apuntando al vacío. Como el alta por foto deja un
-            conteo inicial, casi todos los productos caen en ese caso, y por eso
-            el listado te ofrece archivar en vez de un botón que iba a fallar.
-          </p>
-        </div>
-
-        <h3 className="pt-2 text-base font-bold text-gris-900">Exportar</h3>
-        <p className="max-w-prose text-base text-gris-600">
-          El botón <strong className="font-semibold text-gris-900">Exportar a Excel</strong> del
-          listado descarga un archivo CSV que se abre con doble clic en Excel,
-          en Google Sheets o en LibreOffice. Se lleva{" "}
-          <strong className="font-semibold text-gris-900">exactamente lo que tienes filtrado</strong>{" "}
-          en pantalla: si filtraste por borradores, bajan solo los borradores.
-        </p>
-        <p className="max-w-prose text-base text-gris-600">
-          Los dos precios van en columnas separadas, más una columna que dice de
-          dónde salió cada uno. Es a propósito: fundirlos en un solo &quot;Precio&quot;
-          es lo que convierte la estimación de un modelo en un dato de gestión
-          que nadie vuelve a cuestionar.
-        </p>
-      </section>
-
-      <section className="space-y-4 border-t border-gris-200 pt-7">
-        <Titulo id="roles">Qué puede hacer cada rol</Titulo>
-
-        <div className="overflow-x-auto rounded-lg border border-gris-200">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gris-200 text-left text-xs font-semibold tracking-wide text-gris-500 uppercase">
-                <th className="px-3 py-2">Rol</th>
-                <th className="px-3 py-2">Qué puede hacer</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROLES.map((r) => (
-                <tr key={r} className="border-b border-gris-100 last:border-0">
-                  <td className="px-3 py-3 align-top">
-                    <span className="font-semibold whitespace-nowrap text-gris-900">
-                      {ETIQUETA_ROL[r]}
+        <Seccion
+          id="estados"
+          titulo="Los tres estados"
+          bajada="Todo producto está en uno de tres estados. Las insignias que aparecen a continuación son exactamente las del listado y las de la ficha."
+        >
+          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {ESTADOS.map((e) => {
+              const pres = PRESENTACION_ESTADO[e];
+              return (
+                <li key={e} className="flex overflow-hidden rounded-xl border border-gris-200">
+                  <div className={`w-1.5 shrink-0 ${pres.barra}`} aria-hidden="true" />
+                  <div className="min-w-0 flex-1 p-4 sm:p-5">
+                    <span
+                      className={`inline-flex rounded px-2 py-1 text-xs font-bold tracking-wide uppercase ${pres.insignia}`}
+                    >
+                      {pres.etiqueta}
                     </span>
-                    {r === miRol ? (
-                      <span className="mt-1 block text-xs font-bold text-primario">Tu cuenta</span>
-                    ) : null}
-                  </td>
-                  <td className="px-3 py-3 text-gris-600">{DESCRIPCION_ROL[r]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    <p className="mt-3 text-base text-gris-600">{pres.explica}</p>
+                    <p className="mt-3 border-t border-gris-100 pt-3 text-sm">
+                      <span className="font-bold text-gris-900">Qué corresponde hacer</span>
+                      <br />
+                      <span className="text-gris-600">{QUE_HACER[e]}</span>
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
 
-        <p className="max-w-prose text-sm text-gris-500">
-          El menú de arriba solo muestra las secciones de tu rol. Que una
-          sección no aparezca no es un error: es que tu cuenta no la tiene.
-        </p>
-      </section>
+          <p className="max-w-[65ch] text-sm text-gris-500">
+            El estado nunca se comunica solo mediante color: la palabra está
+            siempre escrita al lado. En una bodega con la pantalla a contraluz, o
+            para quien no distingue esos tonos, el color por sí solo no se lee.
+          </p>
+        </Seccion>
 
-      <section className="space-y-4 border-t border-gris-200 pt-7">
-        <Titulo id="problemas">Cuando algo sale mal</Titulo>
+        <Seccion
+          id="precios"
+          titulo="Los dos precios"
+          bajada="La sección más importante de esta guía. Es el único dato con el que alguien puede tomar una mala decisión creyendo que es firme."
+        >
+          <Ficha titulo="El precio estimado no proviene de una búsqueda en internet" destacada>
+            Proviene del conocimiento del modelo que observa la fotografía, y ese
+            conocimiento tiene fecha de corte. Sirve como orden de magnitud
+            mientras nadie lo ha revisado.{" "}
+            <strong className="font-semibold text-gris-900">
+              No sirve para cotizar, para cobrar ni para decidir una compra.
+            </strong>
+          </Ficha>
 
-        <dl className="space-y-3">
-          {PROBLEMAS.map((f) => (
-            <div key={f.q} className="rounded-lg border border-gris-200 p-4">
-              <dt className="text-sm font-bold text-gris-900">{f.q}</dt>
-              <dd className="mt-1.5 max-w-prose text-sm text-gris-600">{f.a}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Ficha titulo="Precio estimado">
+              Lo propone el análisis de la fotografía. Nunca lo sobrescribe una
+              persona: se conserva aunque se fije otro, porque es la única forma
+              de medir cuánto se desvía el modelo y calibrar cuánta confianza
+              merece.
+            </Ficha>
+            <Ficha titulo="Precio confirmado">
+              Lo ingresa una persona, respaldado por una factura, una cotización
+              o lo que corresponda. Prevalece sobre el estimado: en cuanto
+              existe, es el que se usa para valorizar el inventario.
+            </Ficha>
+          </div>
+
+          <p className="max-w-[65ch] text-base text-gris-600">
+            En el listado y en la ficha siempre se indica de dónde proviene la
+            cifra en pantalla:{" "}
+            <span className="font-semibold text-gris-800">
+              &quot;Estimación del modelo, sin consultar la web&quot;
+            </span>{" "}
+            o{" "}
+            <span className="font-semibold text-gris-800">&quot;Fijado por una persona&quot;</span>.
+          </p>
+          <p className="max-w-[65ch] text-base text-gris-600">
+            La cifra de <strong className="font-semibold text-gris-900">Valorización</strong> de la
+            portada combina ambas, y por eso a su lado va el contador de cuántos
+            productos mantienen precio solo estimado. Sin ese contador, una
+            valorización construida con puras estimaciones se ve igual de firme
+            que una revisada.
+          </p>
+        </Seccion>
+
+        <Seccion
+          id="cantidad"
+          titulo="Cantidad y movimientos"
+          bajada="La cantidad de un producto no se edita. Resulta de la suma de su libro de movimientos y se recalcula cada vez que se registra uno."
+        >
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {MOVIMIENTOS.map((t) => (
+              <div key={t} className="rounded-xl border border-gris-200 p-4 sm:p-5">
+                <dt className="text-base font-bold text-gris-900">{ETIQUETA_MOVIMIENTO[t]}</dt>
+                <dd className="mt-1.5 text-base text-gris-600">{describeMovimiento(t)}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <Ficha titulo="Un movimiento no se edita ni se borra por separado" destacada>
+            Tampoco desde una cuenta de administrador. Un error se corrige
+            registrando un ajuste que lo compense, y ambos quedan a la vista. Un
+            inventario en el que se puede reescribir el pasado no sirve para
+            cuadrar contra una bodega real: cada vez que el número no calce, la
+            explicación tiene que estar en alguna parte.
+          </Ficha>
+        </Seccion>
+
+        <Seccion
+          id="sku"
+          titulo="El código SKU"
+          bajada="Cada producto recibe un código único al crearse, con el prefijo de su categoría y un correlativo."
+        >
+          <p className="max-w-[65ch] text-base text-gris-600">
+            Lo genera la base de datos y no la pantalla, de modo que dos personas
+            cargando fotografías al mismo tiempo desde dos teléfonos nunca
+            reciben el mismo número.
+          </p>
+          <p className="max-w-[65ch] text-base text-gris-600">
+            Es el identificador de búsqueda: el buscador del inventario lo acepta
+            igual que el nombre. Un SKU borrado no se reutiliza.
+          </p>
+        </Seccion>
+
+        <Seccion
+          id="salir"
+          titulo="Archivar, borrar y exportar"
+          bajada="Dos formas de sacar un producto del inventario, que no son intercambiables."
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Ficha titulo="Archivar — reversible">
+              Es la opción recomendada. El producto deja de contarse en las
+              unidades y en la valorización, y conserva su ficha, su fotografía y
+              su libro completo. Se restaura con un clic desde el mismo listado.
+              Disponible para operadores y administradores.
+            </Ficha>
+            <Ficha titulo="Borrar — definitivo">
+              Desaparecen el producto, su código SKU y{" "}
+              <strong className="font-semibold text-gris-900">
+                todo su historial de movimientos
+              </strong>
+              . La fotografía se elimina solo si ningún otro producto la utiliza.
+              Reservado a administradores y exige escribir el código SKU para
+              confirmar.
+            </Ficha>
+          </div>
+
+          <Ficha titulo="Un producto borrado no deja ninguna huella" destacada>
+            No queda el código, ni las unidades que tuvo, ni constancia de que
+            existió. Antes de confirmar, la pantalla indica cuántos movimientos
+            se eliminarán junto con el producto. Cuando el objetivo es solo sacar
+            algo de circulación, corresponde archivar.
+          </Ficha>
+
+          <p className="max-w-[65ch] text-base text-gris-600">
+            Ambas acciones están disponibles de forma individual en cada fila del
+            listado, y de forma masiva seleccionando varias filas con las
+            casillas.
+          </p>
+
+          <h3 className="pt-2 text-base font-bold text-gris-900">Exportar</h3>
+          <p className="max-w-[65ch] text-base text-gris-600">
+            El botón <strong className="font-semibold text-gris-900">Exportar a Excel</strong> del
+            listado descarga un archivo que se abre directamente en Excel, Google
+            Sheets o LibreOffice. Contiene{" "}
+            <strong className="font-semibold text-gris-900">
+              exactamente lo que está filtrado en pantalla
+            </strong>
+            : al filtrar por borradores, se exportan solo los borradores.
+          </p>
+          <p className="max-w-[65ch] text-base text-gris-600">
+            Los dos precios van en columnas separadas, más una columna que indica
+            la procedencia de cada uno. Combinarlos en una sola columna
+            &quot;Precio&quot; es lo que convierte la estimación de un modelo en
+            un dato de gestión que nadie vuelve a cuestionar.
+          </p>
+        </Seccion>
+
+        <Seccion
+          id="roles"
+          titulo="Permisos por rol"
+          bajada="El menú superior muestra únicamente las secciones del rol de la sesión. Que una sección no aparezca no es un error."
+        >
+          <ul className="space-y-3">
+            {ROLES.map((r) => (
+              <li
+                key={r}
+                className={`rounded-xl border p-4 sm:p-5 ${
+                  r === miRol ? "border-primario" : "border-gris-200"
+                }`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-bold text-gris-900">{ETIQUETA_ROL[r]}</h3>
+                  {r === miRol ? (
+                    <span className="rounded bg-marca px-2 py-0.5 text-xs font-bold text-negro">
+                      Esta cuenta
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mt-1.5 max-w-[65ch] text-base text-gris-600">{DESCRIPCION_ROL[r]}</p>
+              </li>
+            ))}
+          </ul>
+        </Seccion>
+
+        <Seccion
+          id="problemas"
+          titulo="Situaciones frecuentes"
+          bajada="Qué hacer cuando el resultado no es el esperado."
+        >
+          <dl className="space-y-3">
+            {PROBLEMAS.map((f) => (
+              <div key={f.q} className="rounded-xl border border-gris-200 p-4 sm:p-5">
+                <dt className="text-base font-bold text-gris-900">{f.q}</dt>
+                <dd className="mt-1.5 max-w-[65ch] text-base text-gris-600">{f.a}</dd>
+              </div>
+            ))}
+          </dl>
+        </Seccion>
+      </div>
     </div>
   );
 }
