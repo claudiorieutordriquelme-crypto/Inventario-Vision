@@ -31,7 +31,9 @@ export default async function InventarioPage({
   ]);
 
   const puedeOperar = perfil ? PERMISOS.operar.includes(perfil.rol) : false;
-  const puedeAdministrar = perfil ? PERMISOS.administrar.includes(perfil.rol) : false;
+  /* Borrar productos NO es lo mismo que administrar: el operador borra, pero
+     no toca categorías ni usuarios. */
+  const puedeBorrar = perfil ? PERMISOS.borrarProductos.includes(perfil.rol) : false;
   const hayFiltros = Object.values(filtros).some(Boolean);
 
   /*
@@ -237,7 +239,7 @@ export default async function InventarioPage({
         <ListaInventario
           productos={listado.productos}
           puedeOperar={puedeOperar}
-          puedeAdministrar={puedeAdministrar}
+          puedeBorrar={puedeBorrar}
         />
       )}
 

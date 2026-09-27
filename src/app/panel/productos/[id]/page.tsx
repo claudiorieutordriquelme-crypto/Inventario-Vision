@@ -27,7 +27,7 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
   if (!producto) notFound();
 
   const puedeOperar = perfil ? PERMISOS.operar.includes(perfil.rol) : false;
-  const puedeAdministrar = perfil ? PERMISOS.administrar.includes(perfil.rol) : false;
+  const puedeBorrar = perfil ? PERMISOS.borrarProductos.includes(perfil.rol) : false;
 
   /*
     La foto vive en un bucket privado. Se firma una URL de vida corta en el
@@ -228,7 +228,7 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
         )}
       </section>
 
-      {puedeAdministrar ? (
+      {puedeBorrar ? (
         <section className="border-t border-gris-200 pt-6">
           <ZonaBorrado
             id={producto.id}

@@ -237,11 +237,11 @@ function Previsualizacion({
 function AccionesFila({
   producto,
   puedeOperar,
-  puedeAdministrar,
+  puedeBorrar,
 }: {
   producto: ProductoListado;
   puedeOperar: boolean;
-  puedeAdministrar: boolean;
+  puedeBorrar: boolean;
 }) {
   const [estadoBorrado, accionBorrar, borrando] = useActionState<EstadoAccion, FormData>(
     eliminarProducto,
@@ -276,7 +276,7 @@ function AccionesFila({
           </form>
         ) : null}
 
-        {puedeAdministrar ? (
+        {puedeBorrar ? (
           <button
             type="button"
             onClick={() => setConfirmando((v) => !v)}
@@ -352,7 +352,7 @@ function AccionesFila({
 function BarraMasiva({
   seleccionados,
   puedeOperar,
-  puedeAdministrar,
+  puedeBorrar,
   alLimpiar,
   accionEstado,
   cambiando,
@@ -362,7 +362,7 @@ function BarraMasiva({
 }: {
   seleccionados: ProductoListado[];
   puedeOperar: boolean;
-  puedeAdministrar: boolean;
+  puedeBorrar: boolean;
   alLimpiar: () => void;
   accionEstado: (datos: FormData) => void;
   cambiando: boolean;
@@ -437,7 +437,7 @@ function BarraMasiva({
             </>
           ) : null}
 
-          {puedeAdministrar ? (
+          {puedeBorrar ? (
             <button
               type="button"
               onClick={() => setConfirmando((v) => !v)}
@@ -453,7 +453,7 @@ function BarraMasiva({
 
       {/* El arrastre se dice antes de apretar nada. Enterarse después de
           confirmar de que se fueron treinta movimientos es enterarse tarde. */}
-      {puedeAdministrar && movimientos > 0 ? (
+      {puedeBorrar && movimientos > 0 ? (
         <p className="mt-2 text-sm text-gris-600">
           Borrarlos se lleva también {movimientos}{" "}
           {movimientos === 1 ? "movimiento" : "movimientos"} de historial. Si
@@ -522,11 +522,11 @@ function BarraMasiva({
 export function ListaInventario({
   productos,
   puedeOperar,
-  puedeAdministrar,
+  puedeBorrar,
 }: {
   productos: ProductoListado[];
   puedeOperar: boolean;
-  puedeAdministrar: boolean;
+  puedeBorrar: boolean;
 }) {
   const [marcados, setMarcados] = useState<string[]>([]);
   const [viendo, setViendo] = useState<ProductoListado | null>(null);
@@ -547,7 +547,7 @@ export function ListaInventario({
     {},
   );
 
-  const puedeSeleccionar = puedeOperar || puedeAdministrar;
+  const puedeSeleccionar = puedeOperar || puedeBorrar;
 
   /*
     La selección se guarda como lista de identificadores y se cruza contra los
@@ -675,7 +675,7 @@ export function ListaInventario({
                 <AccionesFila
                   producto={p}
                   puedeOperar={puedeOperar}
-                  puedeAdministrar={puedeAdministrar}
+                  puedeBorrar={puedeBorrar}
                 />
               </div>
             </li>
@@ -687,7 +687,7 @@ export function ListaInventario({
         <BarraMasiva
           seleccionados={seleccionados}
           puedeOperar={puedeOperar}
-          puedeAdministrar={puedeAdministrar}
+          puedeBorrar={puedeBorrar}
           alLimpiar={() => setMarcados([])}
           accionEstado={accionEstado}
           cambiando={cambiando}

@@ -434,16 +434,16 @@ export default async function GuiaPage() {
               Es la opción recomendada. El producto deja de contarse en las
               unidades y en la valorización, y conserva su ficha, su fotografía y
               su libro completo. Se restaura con un clic desde el mismo listado.
-              Disponible para operadores y administradores.
+              Es la vía correcta cuando solo se necesita sacar algo de
+              circulación.
             </Ficha>
             <Ficha titulo="Borrar — definitivo">
               Desaparecen el producto, su código SKU y{" "}
               <strong className="font-semibold text-gris-900">
                 todo su historial de movimientos
               </strong>
-              . La fotografía se elimina solo si ningún otro producto la utiliza.
-              Reservado a administradores y exige escribir el código SKU para
-              confirmar.
+              . La fotografía se elimina solo si ningún otro producto la
+              utiliza. Exige escribir el código SKU para confirmar.
             </Ficha>
           </div>
 
@@ -455,9 +455,9 @@ export default async function GuiaPage() {
           </Ficha>
 
           <p className="max-w-[65ch] text-base text-gris-600">
-            Ambas acciones están disponibles de forma individual en cada fila del
-            listado, y de forma masiva seleccionando varias filas con las
-            casillas.
+            Ambas acciones están disponibles para operadores y administradores,
+            de forma individual en cada fila del listado y de forma masiva
+            seleccionando varias filas con las casillas.
           </p>
 
           <h3 className="pt-2 text-base font-bold text-gris-900">Exportar</h3>

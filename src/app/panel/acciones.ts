@@ -433,9 +433,9 @@ export async function registrarMovimiento(
 */
 export async function eliminarProducto(_p: EstadoAccion, datos: FormData): Promise<EstadoAccion> {
   try {
-    await requiereRol(PERMISOS.administrar);
+    await requiereRol(PERMISOS.borrarProductos);
   } catch {
-    return { error: "Solo un administrador puede borrar un producto." };
+    return { error: "Tu rol no permite borrar productos." };
   }
 
   const id = texto(datos, "id");
@@ -606,9 +606,9 @@ export async function eliminarProductos(
   datos: FormData,
 ): Promise<EstadoMasivo> {
   try {
-    await requiereRol(PERMISOS.administrar);
+    await requiereRol(PERMISOS.borrarProductos);
   } catch {
-    return { error: "Solo un administrador puede borrar productos." };
+    return { error: "Tu rol no permite borrar productos." };
   }
 
   const ids = datos.getAll("ids").map((v) => String(v)).filter(Boolean);

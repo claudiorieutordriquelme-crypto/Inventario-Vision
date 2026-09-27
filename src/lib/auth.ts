@@ -83,8 +83,17 @@ export const PERMISOS = {
   leer: ["admin", "operador", "lector"] as Rol[],
   /** Carga fotos, da de alta y edita productos, registra movimientos. */
   operar: ["admin", "operador"] as Rol[],
-  /** Categorías, usuarios y cualquier borrado. */
+  /** Categorías, usuarios y la configuración de la demostración. */
   administrar: ["admin"] as Rol[],
+  /*
+    Borrar productos. Va aparte de administrar porque el operador lo tiene y
+    el resto de lo administrativo no: quien ya puede editar cualquier campo y
+    archivar no gana nada protegido al no poder borrar.
+
+    La política RLS productos_delete_operador dice lo mismo del lado de la
+    base, y es la que manda. Esto es solo para decidir qué se dibuja.
+  */
+  borrarProductos: ["admin", "operador"] as Rol[],
 };
 
 /*

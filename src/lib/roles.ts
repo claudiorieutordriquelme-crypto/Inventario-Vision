@@ -22,7 +22,8 @@ export const ETIQUETA_ROL: Record<Rol, string> = {
 };
 
 export const DESCRIPCION_ROL: Record<Rol, string> = {
-  admin: "Acceso total: productos, categorías, usuarios y borrado.",
-  operador: "Carga fotos, da de alta productos y registra movimientos. No borra.",
+  admin: "Acceso total: productos, categorías, usuarios y configuración.",
+  operador:
+    "Carga fotos, da de alta productos, los edita, registra movimientos, archiva y borra productos. No administra categorías ni usuarios.",
   lector: "Solo lectura del inventario.",
 };
