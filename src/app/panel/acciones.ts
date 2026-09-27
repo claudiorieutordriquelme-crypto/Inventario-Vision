@@ -469,14 +469,7 @@ export async function eliminarProducto(_p: EstadoAccion, datos: FormData): Promi
     la ficha mostraría una imagen rota.
   */
   const borrado = data[0] as { sku: string; foto_path: string | null; foto_bucket: string | null };
-  if (borrado.foto_path) {
-    const { error: errorFoto } = await supabase.storage
-      .from(borrado.foto_bucket ?? "fotos")
-      .remove([borrado.foto_path]);
-    if (errorFoto) {
-      console.error("Borré el producto pero no su foto:", errorFoto.message);
-    }
-  }
+  await borraFotoSiQuedoHuerfana(supabase, borrado.foto_path, borrado.foto_bucket);
 
   revalidatePath("/panel");
   redirect("/panel");
@@ -542,5 +535,194 @@ export async function cambiarEstadoProducto(
       estado === "archivado"
         ? `${sku} quedó archivado. Sigue en el sistema con todo su historial.`
         : `${sku} volvió a borrador.`,
+  };
+}
+
+/*
+  Borra del bucket una foto QUE YA NO USA NADIE.
+
+  ESTE ERA UN DEFECTO REAL, no una precaución teórica. Una foto puede dar hasta
+  doce productos, y los doce guardan la MISMA ruta. El borrado original sacaba
+  el archivo del bucket apenas se borraba un producto, así que borrar uno de
+  siete hermanos dejaba a los otros seis con la imagen rota, sin aviso y sin
+  forma de recuperarla.
+
+  Hoy el inventario tiene una foto compartida por siete productos, así que esto
+  no era hipotético.
+
+  Se consulta DESPUÉS de borrar la fila, no antes: en ese momento la respuesta
+  ya refleja el borrado. Y ante cualquier duda se conserva el archivo. Un
+  archivo huérfano ocupa unos kilobytes; una foto borrada de más no se
+  recupera.
+*/
+async function borraFotoSiQuedoHuerfana(
+  supabase: Awaited<ReturnType<typeof crearClienteServidor>>,
+  rutas: string | string[] | null,
+  bucket: string | null,
+): Promise<void> {
+  const lista = [...new Set((Array.isArray(rutas) ? rutas : [rutas]).filter(Boolean) as string[])];
+  if (lista.length === 0) return;
+
+  const { data, error } = await supabase
+    .from("productos")
+    .select("foto_path")
+    .in("foto_path", lista);
+
+  if (error) {
+    console.error("No pude comprobar si la foto sigue en uso, la conservo:", error.message);
+    return;
+  }
+
+  const enUso = new Set(((data ?? []) as { foto_path: string }[]).map((f) => f.foto_path));
+  const huerfanas = lista.filter((r) => !enUso.has(r));
+  if (huerfanas.length === 0) return;
+
+  const { error: errorFoto } = await supabase.storage.from(bucket ?? "fotos").remove(huerfanas);
+  if (errorFoto) {
+    console.error("Borré los productos pero no sus fotos:", errorFoto.message);
+  }
+}
+
+export type EstadoMasivo = EstadoAccion & {
+  /** Cuántos se procesaron de verdad. Se usa para limpiar la selección. */
+  hechos?: number;
+};
+
+/*
+  Borrado masivo.
+
+  LO QUE HACE DISTINTO A ESTA ACCIÓN: no es un ciclo que llama al borrado de a
+  uno. Es un solo DELETE con una lista de identificadores, y hay una razón:
+  borrar de a uno desde el servidor, ante un fallo a la mitad, deja media
+  selección borrada y a la persona sin saber cuál mitad.
+
+  EL FILTRO DE LO QUE SE PUEDE BORRAR LO HACE LA BASE, NO EL NAVEGADOR. La
+  pantalla ya sabe cuáles tienen movimientos y no los manda, pero eso es
+  comodidad, no seguridad: la lista de identificadores llega del cliente y
+  puede venir manipulada. Acá se vuelve a preguntar cuáles tienen historial y
+  esos se excluyen; si igual se colara uno, la llave RESTRICT lo rechazaría.
+
+  LA RESPUESTA DICE LOS TRES NÚMEROS: cuántos se borraron, cuántos se saltaron
+  por tener historial y cuántos ya no existían. Un "listo" sin números deja a
+  la persona creyendo que se fueron todos.
+*/
+export async function eliminarProductos(
+  _p: EstadoMasivo,
+  datos: FormData,
+): Promise<EstadoMasivo> {
+  try {
+    await requiereRol(PERMISOS.administrar);
+  } catch {
+    return { error: "Solo un administrador puede borrar productos." };
+  }
+
+  const ids = datos.getAll("ids").map((v) => String(v)).filter(Boolean);
+  if (ids.length === 0) return { error: "No seleccionaste ningún producto." };
+
+  /*
+    La confirmación es la palabra, no los SKU: en una selección de treinta no
+    se puede pedir que los escriba todos. Lo que sí se hace es mostrarle los
+    SKU en pantalla antes de pedirla.
+  */
+  if (texto(datos, "confirmacion").toUpperCase() !== "BORRAR") {
+    return { error: 'Para borrar, escribe la palabra BORRAR.' };
+  }
+
+  const supabase = await crearClienteServidor();
+
+  const { data: conHistorial, error: errorMov } = await supabase
+    .from("movimientos_inventario")
+    .select("producto_id")
+    .in("producto_id", ids);
+
+  if (errorMov) {
+    console.error("No pude comprobar el historial:", errorMov.message);
+    return { error: "No pude comprobar cuáles tienen historial. No borré nada." };
+  }
+
+  const protegidos = new Set(
+    ((conHistorial ?? []) as { producto_id: string }[]).map((m) => m.producto_id),
+  );
+  const borrables = ids.filter((id) => !protegidos.has(id));
+
+  if (borrables.length === 0) {
+    return {
+      error: `Ninguno de los ${ids.length} seleccionados se puede borrar: todos tienen movimientos. Archívalos.`,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("productos")
+    .delete()
+    .in("id", borrables)
+    .select("sku, foto_path, foto_bucket");
+
+  if (error) return { error: traduce(error.code, error.message) };
+
+  const borrados = (data ?? []) as { sku: string; foto_path: string | null; foto_bucket: string | null }[];
+
+  await borraFotoSiQuedoHuerfana(
+    supabase,
+    borrados.map((b) => b.foto_path).filter(Boolean) as string[],
+    borrados[0]?.foto_bucket ?? "fotos",
+  );
+
+  revalidatePath("/panel");
+
+  const partes = [`${borrados.length} ${borrados.length === 1 ? "producto borrado" : "productos borrados"}`];
+  if (protegidos.size > 0) {
+    partes.push(`${protegidos.size} con movimientos que no se pueden borrar`);
+  }
+  const noEncontrados = borrables.length - borrados.length;
+  if (noEncontrados > 0) partes.push(`${noEncontrados} que ya no existían`);
+
+  return { ok: `${partes.join(", ")}.`, hechos: borrados.length };
+}
+
+/*
+  Archivado masivo. Es la operación que de verdad se va a usar: casi todo
+  producto tiene movimientos y por lo tanto no se borra.
+
+  No pide confirmación escrita, y es deliberado: archivar no destruye nada y
+  se deshace con un clic desde el mismo listado. Pedir una palabra para una
+  acción reversible entrena a la gente a escribirla sin leer, y para cuando
+  aparece una irreversible ya la escriben en automático.
+*/
+export async function cambiarEstadoProductos(
+  _p: EstadoMasivo,
+  datos: FormData,
+): Promise<EstadoMasivo> {
+  try {
+    await requiereRol(PERMISOS.operar);
+  } catch {
+    return { error: "Tu rol no permite cambiar el estado de un producto." };
+  }
+
+  const ids = datos.getAll("ids").map((v) => String(v)).filter(Boolean);
+  const estado = texto(datos, "estado");
+
+  if (ids.length === 0) return { error: "No seleccionaste ningún producto." };
+  if (estado !== "archivado" && estado !== "borrador") {
+    return { error: "Desde el listado solo se puede archivar o devolver a borrador." };
+  }
+
+  const supabase = await crearClienteServidor();
+  const { data, error } = await supabase
+    .from("productos")
+    .update({ estado })
+    .in("id", ids)
+    .select("sku");
+
+  if (error) return { error: traduce(error.code, error.message) };
+
+  const n = (data ?? []).length;
+  revalidatePath("/panel");
+
+  return {
+    ok:
+      estado === "archivado"
+        ? `${n} ${n === 1 ? "producto archivado" : "productos archivados"}. Conservan su historial.`
+        : `${n} ${n === 1 ? "producto devuelto" : "productos devueltos"} a borrador.`,
+    hechos: n,
   };
 }

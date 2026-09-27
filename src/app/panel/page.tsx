@@ -1,15 +1,9 @@
 import Link from "next/link";
 import { PERMISOS, perfilHabilitado } from "@/lib/auth";
 import { cargarResumen, listarCategorias, listarProductos } from "@/lib/datos/inventario";
-import {
-  ETIQUETA_ESTADO,
-  PRESENTACION_ESTADO,
-  formateaNumero,
-  formateaPesos,
-  procedenciaPrecio,
-} from "@/lib/formato";
+import { ETIQUETA_ESTADO, formateaNumero, formateaPesos } from "@/lib/formato";
 import type { EstadoProducto } from "@/lib/tipos";
-import { AccionesFila } from "./piezas-listado";
+import { ListaInventario } from "./piezas-listado";
 
 /*
   Listado del inventario.
@@ -234,70 +228,17 @@ export default async function InventarioPage({
           ) : null}
         </div>
       ) : (
-        /* Una columna en el teléfono y dos desde 1024px. Con el contenedor a
-           72rem, una sola columna deja tarjetas de casi un metro de ancho con
-           tres datos adentro, y obliga a recorrer el doble de pantalla para
-           ver la misma cantidad de productos. */
-        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {listado.productos.map((p) => {
-            const pres = PRESENTACION_ESTADO[p.estado];
-            const precio = procedenciaPrecio(p.precio_confirmado_clp, p.precio_estimado_clp);
-            return (
-              <li key={p.id} className="flex overflow-hidden rounded-lg border border-gris-200">
-                <div className={`w-2 shrink-0 ${pres.barra}`} aria-hidden="true" />
-                <div className="min-w-0 flex-1 p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold tracking-wide text-gris-500 uppercase">
-                        {p.categoria_nombre ?? "Sin categoría"}
-                      </p>
-                      <h2 className="text-lg font-bold text-gris-900">{p.nombre}</h2>
-                      <p className="mt-0.5 font-mono text-sm font-semibold text-gris-700">
-                        {p.sku}
-                      </p>
-                    </div>
-
-                    {/* La insignia lleva la palabra, no solo el color. */}
-                    <span
-                      className={`shrink-0 rounded px-2 py-1 text-xs font-bold tracking-wide uppercase ${pres.insignia}`}
-                    >
-                      {pres.etiqueta}
-                    </span>
-                  </div>
-
-                  <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gris-600">
-                    <div className="flex gap-1">
-                      <dt className="font-semibold">Cantidad:</dt>
-                      <dd>
-                        {formateaNumero(p.cantidad)} {p.unidad}
-                      </dd>
-                    </div>
-                    <div className="flex gap-1">
-                      <dt className="font-semibold">Precio:</dt>
-                      <dd>{precio.valor}</dd>
-                    </div>
-                    {p.ubicacion ? (
-                      <div className="flex gap-1">
-                        <dt className="font-semibold">Ubicación:</dt>
-                        <dd>{p.ubicacion}</dd>
-                      </div>
-                    ) : null}
-                  </dl>
-
-                  {precio.revisar ? (
-                    <p className="mt-2 text-xs text-gris-500">{precio.origen}</p>
-                  ) : null}
-
-                  <AccionesFila
-                    producto={p}
-                    puedeOperar={puedeOperar}
-                    puedeAdministrar={puedeAdministrar}
-                  />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        /*
+          El listado pasa a ser un componente de cliente porque la selección
+          múltiple es estado compartido entre filas: cada casilla necesita
+          saber cuántas otras están marcadas. Los datos siguen viniendo de acá,
+          ya leídos y filtrados por RLS.
+        */
+        <ListaInventario
+          productos={listado.productos}
+          puedeOperar={puedeOperar}
+          puedeAdministrar={puedeAdministrar}
+        />
       )}
 
       {/* Un corte que no se declara se lee como "esto es todo". */}

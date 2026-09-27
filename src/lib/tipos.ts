@@ -42,6 +42,12 @@ export type Producto = {
   foto_path: string | null;
   foto_bucket: string | null;
   notas: string | null;
+  /* Los tres siguientes los agregó la migración del análisis múltiple: de qué
+     análisis salió, en qué orden apareció y dónde está dentro de la imagen
+     descrito con palabras. Faltaban en este tipo aunque la base los devuelve. */
+  analisis_id: string | null;
+  indice_en_foto: number | null;
+  ubicacion_en_foto: string | null;
   creado_por: string | null;
   created_at: string;
   updated_at: string;
