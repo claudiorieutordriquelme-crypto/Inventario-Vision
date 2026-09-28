@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { PERMISOS, perfilHabilitado } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
 import { formateaNumero, formateaPesos } from "@/lib/formato";
+import { BorrarProducto } from "@/app/panel/borrar-producto";
 
 /*
   Revisión de lo que salió de una foto.
@@ -35,7 +36,7 @@ export default async function RevisionPage({ params }: { params: Promise<{ id: s
     supabase
       .from("productos")
       .select(
-        "id, sku, nombre, descripcion, cantidad, unidad, precio_estimado_clp, ubicacion_en_foto, indice_en_foto, notas, categorias(nombre)",
+        "id, sku, nombre, descripcion, cantidad, unidad, precio_estimado_clp, ubicacion_en_foto, indice_en_foto, notas, categorias(nombre), movimientos_inventario(count)",
       )
       .eq("analisis_id", id)
       .order("indice_en_foto"),
@@ -75,14 +76,19 @@ export default async function RevisionPage({ params }: { params: Promise<{ id: s
     indice_en_foto: number | null;
     notas: string | null;
     categorias: { nombre: string } | { nombre: string }[] | null;
+    movimientos_inventario: { count: number }[] | { count: number } | null;
   };
 
   const productos = ((resProductos.data ?? []) as unknown as Fila[]).map((p) => ({
     ...p,
     categoria_nombre: uno(p.categorias)?.nombre ?? null,
+    /* Se cuenta para poder declarar, antes de confirmar un borrado, cuánto
+       historial se lleva en cascada. */
+    movimientos: Number(uno(p.movimientos_inventario)?.count ?? 0),
   }));
 
   const puedeOperar = PERMISOS.operar.includes(perfil.rol);
+  const puedeBorrar = PERMISOS.borrarProductos.includes(perfil.rol);
 
   return (
     <div className="space-y-6">
@@ -96,7 +102,8 @@ export default async function RevisionPage({ params }: { params: Promise<{ id: s
         </h1>
         <p className="mt-1 max-w-prose text-base text-gris-600">
           Todos quedaron en <strong className="font-semibold text-gris-900">borrador</strong>.
-          Revisa cada uno y confírmalo, o corrígelo si el análisis se equivocó.
+          Revisa cada uno y confírmalo, corrígelo si el análisis se equivocó, o
+          bórralo desde aquí mismo si no corresponde a nada real.
         </p>
       </div>
 
@@ -196,13 +203,24 @@ export default async function RevisionPage({ params }: { params: Promise<{ id: s
                       </p>
                     ) : null}
 
-                    <div className="mt-3 text-sm font-semibold">
+                    {/*
+                      El borrado vive acá y no solo en el listado porque esta
+                      es la pantalla donde se necesita: llegan ocho productos
+                      de golpe y dos están mal identificados. Mandar a la
+                      persona a buscarlos después entre quinientos, o a entrar
+                      uno por uno a su ficha, es la forma más segura de que los
+                      deje ahí y ensucien el inventario para siempre.
+                    */}
+                    <div className="mt-3 flex flex-wrap items-start gap-2">
                       <Link
                         href={`/panel/productos/${p.id}`}
-                        className="text-primario hover:underline"
+                        className="inline-flex items-center rounded-lg bg-primario px-3 py-2 text-sm font-semibold text-blanco transition-opacity hover:opacity-90"
                       >
                         {puedeOperar ? "Revisar y confirmar" : "Ver ficha"}
                       </Link>
+                      {puedeBorrar ? (
+                        <BorrarProducto id={p.id} sku={p.sku} movimientos={p.movimientos} />
+                      ) : null}
                     </div>
                   </div>
                 </li>

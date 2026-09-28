@@ -5,7 +5,6 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import {
   cambiarEstadoProducto,
   cambiarEstadoProductos,
-  eliminarProducto,
   eliminarProductos,
   type EstadoAccion,
   type EstadoMasivo,
@@ -18,6 +17,7 @@ import {
   procedenciaPrecio,
 } from "@/lib/formato";
 import type { ProductoListado } from "@/lib/tipos";
+import { BorrarProducto } from "./borrar-producto";
 
 /*
   El listado del inventario, con selección, previsualización y acciones.
@@ -243,106 +243,50 @@ function AccionesFila({
   puedeOperar: boolean;
   puedeBorrar: boolean;
 }) {
-  const [estadoBorrado, accionBorrar, borrando] = useActionState<EstadoAccion, FormData>(
-    eliminarProducto,
-    {},
-  );
   const [estadoCambio, accionCambiar, cambiando] = useActionState<EstadoAccion, FormData>(
     cambiarEstadoProducto,
     {},
   );
-  const [confirmando, setConfirmando] = useState(false);
 
   const archivado = producto.estado === "archivado";
 
+  /*
+    LAS TRES ACCIONES SON BOTONES, no palabras sueltas en una fila de texto.
+    La versión anterior ponía "Borrar" como un enlace más entre otros dos, y en
+    un teléfono nadie lo leía como una acción disponible. Un borrado que no se
+    encuentra es un borrado que no existe.
+  */
   return (
-    <div className="mt-3 border-t border-gris-100 pt-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold">
-        <Link href={`/panel/productos/${producto.id}`} className="text-primario hover:underline">
-          Ver y editar
-        </Link>
+    <div className="mt-3 flex flex-wrap items-start gap-2 border-t border-gris-100 pt-3">
+      <Link
+        href={`/panel/productos/${producto.id}`}
+        className="inline-flex items-center rounded-lg bg-primario px-3 py-2 text-sm font-semibold text-blanco transition-opacity hover:opacity-90"
+      >
+        Ver y editar
+      </Link>
 
-        {puedeOperar ? (
-          <form action={accionCambiar} className="contents">
-            <input type="hidden" name="id" value={producto.id} />
-            <input type="hidden" name="estado" value={archivado ? "borrador" : "archivado"} />
-            <button
-              type="submit"
-              disabled={cambiando}
-              className="text-gris-600 transition-colors hover:text-gris-900 disabled:opacity-60"
-            >
-              {cambiando ? "Guardando..." : archivado ? "Restaurar" : "Archivar"}
-            </button>
-          </form>
-        ) : null}
-
-        {puedeBorrar ? (
-          <button
-            type="button"
-            onClick={() => setConfirmando((v) => !v)}
-            aria-expanded={confirmando}
-            className="text-acento transition-opacity hover:opacity-80"
-          >
-            {confirmando ? "Cancelar" : "Borrar"}
-          </button>
-        ) : null}
-      </div>
-
-      <Mensaje estado={estadoCambio} />
-
-      {confirmando ? (
-        <form action={accionBorrar} className="mt-3 rounded-lg border border-acento p-3">
+      {puedeOperar ? (
+        <form action={accionCambiar}>
           <input type="hidden" name="id" value={producto.id} />
-          <input type="hidden" name="sku_esperado" value={producto.sku} />
-
-          <p className="text-sm text-gris-700">
-            Se borra el producto y su SKU, que no se reutiliza
-            {producto.movimientos > 0 ? (
-              <>
-                , junto con sus{" "}
-                <strong className="font-semibold text-gris-900">
-                  {producto.movimientos}{" "}
-                  {producto.movimientos === 1 ? "movimiento" : "movimientos"}
-                </strong>
-              </>
-            ) : null}
-            . La foto solo se borra si ningún otro producto la está usando. No
-            hay forma de deshacerlo.
-          </p>
-
-          <label className="mt-2.5 block max-w-xs">
-            <span className="text-sm font-semibold text-gris-800">
-              Escribe <span className="font-mono font-bold">{producto.sku}</span> para confirmar
-            </span>
-            <input
-              name="confirmacion"
-              autoComplete="off"
-              autoFocus
-              placeholder={producto.sku}
-              className={claseConfirmacion}
-            />
-          </label>
-
-          <Mensaje estado={estadoBorrado} />
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={borrando}
-              className="rounded-md bg-acento px-4 py-2.5 text-sm font-semibold text-negro transition-opacity hover:opacity-90 disabled:opacity-60"
-            >
-              {borrando ? "Borrando..." : "Borrar definitivamente"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmando(false)}
-              className="rounded-md border border-gris-300 px-4 py-2.5 text-sm font-semibold text-gris-800"
-            >
-              Cancelar
-            </button>
-          </div>
+          <input type="hidden" name="estado" value={archivado ? "borrador" : "archivado"} />
+          <button
+            type="submit"
+            disabled={cambiando}
+            className="inline-flex items-center rounded-lg border border-gris-300 px-3 py-2 text-sm font-semibold text-gris-800 transition-colors hover:border-primario hover:text-primario disabled:opacity-60"
+          >
+            {cambiando ? "Guardando..." : archivado ? "Restaurar" : "Archivar"}
+          </button>
         </form>
       ) : null}
+
+      {puedeBorrar ? (
+        <BorrarProducto id={producto.id} sku={producto.sku} movimientos={producto.movimientos} />
+      ) : null}
+
+      <div className="w-full">
+        <Mensaje estado={estadoCambio} />
+      </div>
+
     </div>
   );
 }

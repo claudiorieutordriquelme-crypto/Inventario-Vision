@@ -1,5 +1,5 @@
 /*
-  Logo de Pánico Ideas.
+  Logo de Paniko Ideas.
 
   QUÉ ES ESTO Y QUÉ NO ES. Es un redibujo vectorial del logo: el globo de
   diálogo con la cola, el círculo blanco y el lettering en los dos ámbares de
@@ -31,7 +31,7 @@ export function Logo({
       viewBox="0 0 120 120"
       className={className ?? "size-12"}
       role="img"
-      aria-label="Pánico Ideas"
+      aria-label="Paniko Ideas"
     >
       {/* El círculo blanco del original. Sobre fondo oscuro es lo que separa la
           marca del resto; sobre blanco desaparece, que es correcto. */}
@@ -45,7 +45,7 @@ export function Logo({
       {conTexto ? (
         <>
           {/*
-            Dos líneas y dos tonos, como el original: PÁNICO en el ámbar pleno,
+            Dos líneas y dos tonos, como el original: PANIKO en el ámbar pleno,
             IDEAS en el tono más cálido. Los dos van sobre negro, donde el
             ámbar da 10:1.
 
@@ -63,7 +63,7 @@ export function Logo({
             fontWeight="700"
             fill="var(--color-marca)"
           >
-            PÁNICO
+            PANIKO
           </text>
           <text
             x="60"
@@ -94,7 +94,7 @@ export function LogoLinea({ className }: { className?: string }) {
     <span className={`flex items-center gap-2.5 ${className ?? ""}`}>
       <Logo conTexto={false} className="size-8 shrink-0" />
       <span className="leading-none">
-        <span className="block text-sm font-bold tracking-wide text-marca">PÁNICO</span>
+        <span className="block text-sm font-bold tracking-wide text-marca">PANIKO</span>
         <span className="block text-sm font-bold tracking-wide text-marca-clara">IDEAS</span>
       </span>
     </span>

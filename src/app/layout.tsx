@@ -38,7 +38,7 @@ export const viewport = {
     Color de la barra del navegador en móvil. Va el NEGRO de la marca, que es
     el mismo del encabezado de la aplicación: así la barra del sistema y la de
     la aplicación se leen como una sola pieza. Quedó en azul al repintar a la
-    paleta de Pánico Ideas, y era un color que ya no existe en la interfaz.
+    paleta de Paniko Ideas, y era un color que ya no existe en la interfaz.
   */
   themeColor: "#0a0a0a",
 };
