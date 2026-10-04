@@ -42,6 +42,14 @@ export default async function CategoriasPage() {
     ]),
   );
 
+  /*
+    Solo una categoría raíz puede ser madre: el árbol es de un solo nivel y el
+    trigger de la base rechaza lo demás. Ofrecer las hijas en el menú sería
+    ofrecer una opción que siempre falla.
+  */
+  const raices = categorias.filter((c) => !c.padre_id);
+  const nombrePorId = new Map(categorias.map((c) => [c.id, c.nombre]));
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -53,7 +61,7 @@ export default async function CategoriasPage() {
             una de estas o deja el producto sin clasificar.
           </p>
         </div>
-        <CrearCategoria />
+        <CrearCategoria raices={raices} />
       </div>
 
       {error ? (
@@ -75,6 +83,14 @@ export default async function CategoriasPage() {
               <li key={c.id} className="rounded-lg border border-gris-200 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                   <div className="min-w-0">
+                    {/* La madre va encima del nombre y no al lado: leer
+                        "Antigüedades / Muñecas de porcelana" de corrido es lo
+                        que hace entender la jerarquía sin explicarla. */}
+                    {c.padre_id ? (
+                      <p className="text-xs font-semibold tracking-wide text-gris-500 uppercase">
+                        {nombrePorId.get(c.padre_id) ?? "Categoría madre borrada"}
+                      </p>
+                    ) : null}
                     <h2 className="text-lg font-bold text-gris-900">{c.nombre}</h2>
                     <p className="mt-0.5 font-mono text-sm font-semibold text-gris-700">
                       {c.prefijo_sku}-0001
@@ -84,11 +100,20 @@ export default async function CategoriasPage() {
                     ) : null}
                   </div>
 
-                  {!c.activo ? (
-                    <span className="shrink-0 rounded bg-gris-200 px-2 py-1 text-xs font-bold tracking-wide text-gris-700 uppercase">
-                      Inactiva
-                    </span>
-                  ) : null}
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {/* Ámbar de marca con texto negro: 10:1 medido. Lleva su
+                        palabra escrita, nunca es solo el color. */}
+                    {c.pieza_unica ? (
+                      <span className="rounded bg-marca px-2 py-1 text-xs font-bold tracking-wide text-negro uppercase">
+                        Pieza única
+                      </span>
+                    ) : null}
+                    {!c.activo ? (
+                      <span className="rounded bg-gris-200 px-2 py-1 text-xs font-bold tracking-wide text-gris-700 uppercase">
+                        Inactiva
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gris-600">
@@ -103,7 +128,11 @@ export default async function CategoriasPage() {
                 </dl>
 
                 {conteoFiable ? (
-                  <AccionesCategoria categoria={c} productos={productos} />
+                  <AccionesCategoria
+                    categoria={c}
+                    productos={productos}
+                    raices={raices.filter((r) => r.id !== c.id)}
+                  />
                 ) : (
                   <p className="mt-3 border-t border-gris-100 pt-3 text-sm text-gris-600">
                     No pude contar los productos de esta categoría, así que no

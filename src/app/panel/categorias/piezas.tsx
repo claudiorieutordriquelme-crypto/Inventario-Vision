@@ -27,7 +27,49 @@ function Mensaje({ estado }: { estado: EstadoCategoria }) {
   );
 }
 
-export function CrearCategoria() {
+/*
+  La marca de pieza única se explica por lo que HACE, no por lo que significa:
+  activarla no es ponerle una etiqueta al rubro, es un candado en la base que
+  va a rechazar el segundo ingreso de ese producto. Quien la encienda sin saber
+  eso se topa con un error al cargar y no entiende de dónde salió.
+*/
+function CampoPiezaUnica({ valor }: { valor: boolean }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-semibold text-gris-800">Pieza única</span>
+      <select name="pieza_unica" defaultValue={valor ? "1" : "0"} className={claseCampo}>
+        <option value="0">No, puede haber varias iguales</option>
+        <option value="1">Sí, una sola unidad</option>
+      </select>
+      <span className="mt-1 block text-xs text-gris-500">
+        La base impide que un producto de esta categoría quede con más de una
+        unidad. Las subcategorías heredan la marca.
+      </span>
+    </label>
+  );
+}
+
+function CampoMadre({ raices, valor }: { raices: Categoria[]; valor: string | null }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-semibold text-gris-800">Categoría madre</span>
+      <select name="padre_id" defaultValue={valor ?? ""} className={claseCampo}>
+        <option value="">Ninguna, es una categoría raíz</option>
+        {raices.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.nombre}
+          </option>
+        ))}
+      </select>
+      <span className="mt-1 block text-xs text-gris-500">
+        El árbol es de un solo nivel. Una subcategoría lleva igual su propio
+        prefijo de SKU: dos categorías no pueden compartirlo.
+      </span>
+    </label>
+  );
+}
+
+export function CrearCategoria({ raices }: { raices: Categoria[] }) {
   const [estado, accion, pendiente] = useActionState<EstadoCategoria, FormData>(crearCategoria, {});
   const [abierto, setAbierto] = useState(false);
 
@@ -90,6 +132,9 @@ export function CrearCategoria() {
           <span className="text-sm font-semibold text-gris-800">Orden</span>
           <input type="number" name="orden" defaultValue={100} className={claseCampo} />
         </label>
+
+        <CampoMadre raices={raices} valor={null} />
+        <CampoPiezaUnica valor={false} />
       </div>
 
       <Mensaje estado={estado} />
@@ -117,9 +162,12 @@ export function CrearCategoria() {
 export function AccionesCategoria({
   categoria,
   productos,
+  raices,
 }: {
   categoria: Categoria;
   productos: number;
+  /** Las raíces que pueden ser madre de esta. Sin ella misma. */
+  raices: Categoria[];
 }) {
   const [modo, setModo] = useState<"cerrado" | "editar" | "borrar">("cerrado");
   const [estadoEdicion, accionEditar, editando] = useActionState<EstadoCategoria, FormData>(
@@ -205,6 +253,9 @@ export function AccionesCategoria({
                 className={claseCampo}
               />
             </label>
+
+            <CampoMadre raices={raices} valor={categoria.padre_id} />
+            <CampoPiezaUnica valor={categoria.pieza_unica} />
           </div>
 
           <p className="mt-3 text-xs text-gris-500">
@@ -212,6 +263,18 @@ export function AccionesCategoria({
             edita: los SKU ya emitidos no se renumeran, así que cambiarlo dejaría
             productos con un prefijo que no corresponde a su categoría.
           </p>
+
+          {/* Lo que la marca NO hace, y hay que decirlo acá: el candado vive en
+              productos, así que encenderlo ahora no corrige lo ya cargado.
+              Quien no lo sepa va a creer que el sistema le arregló el stock. */}
+          {!categoria.pieza_unica && productos > 0 ? (
+            <p className="mt-2 text-xs text-gris-500">
+              Si la marcas como pieza única, el candado rige de ahí en adelante:
+              los productos que ya tengan más de una unidad quedan como están, y
+              fallarán la próxima vez que se les registre un movimiento. Conviene
+              revisarlos antes.
+            </p>
+          ) : null}
 
           <Mensaje estado={estadoEdicion} />
 

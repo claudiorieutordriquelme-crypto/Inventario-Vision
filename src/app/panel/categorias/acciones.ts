@@ -26,6 +26,17 @@ function traduce(codigo: string | undefined, mensaje: string): string {
     if (mensaje.includes("codigo_slug")) {
       return "El código va en minúsculas, sin espacios ni acentos. Usa guion bajo si necesitas separar.";
     }
+    /* Los tres de abajo los levanta el trigger categorias_un_solo_nivel, y el
+       mensaje de la base ya está escrito para que lo lea una persona. */
+    if (mensaje.includes("un solo nivel")) {
+      return "Esa categoría ya es una subcategoría. El árbol es de un solo nivel: elige una categoría raíz como madre.";
+    }
+    if (mensaje.includes("ya tiene subcategorias")) {
+      return "Esta categoría tiene subcategorías, así que no puede pasar a ser hija de otra. Primero saca a sus hijas.";
+    }
+    if (mensaje.includes("no_es_su_propio_padre")) {
+      return "Una categoría no puede ser su propia madre.";
+    }
     return "Los datos no cumplen una regla de la base.";
   }
   console.error("Error de base en categorías:", mensaje);
@@ -75,6 +86,9 @@ export async function crearCategoria(
     prefijo_sku: prefijo,
     descripcion: texto(datos, "descripcion") || null,
     orden: Number(texto(datos, "orden")) || 100,
+    /* Cadena vacía es "ninguna", no una madre llamada "". */
+    padre_id: texto(datos, "padre_id") || null,
+    pieza_unica: texto(datos, "pieza_unica") === "1",
   });
 
   if (error) return { error: traduce(error.code, error.message) };
@@ -113,6 +127,8 @@ export async function actualizarCategoria(
       descripcion: texto(datos, "descripcion") || null,
       orden: Number(texto(datos, "orden")) || 100,
       activo: texto(datos, "activo") === "1",
+      padre_id: texto(datos, "padre_id") || null,
+      pieza_unica: texto(datos, "pieza_unica") === "1",
     })
     .eq("id", id)
     .select("nombre");

@@ -26,7 +26,7 @@ export const listarCategorias = cache(
     const supabase = await crearClienteServidor();
     let consulta = supabase
       .from("categorias")
-      .select("id, codigo, nombre, prefijo_sku, descripcion, orden, activo")
+      .select("id, codigo, nombre, prefijo_sku, descripcion, orden, activo, padre_id, pieza_unica")
       .order("orden")
       .order("nombre");
 
