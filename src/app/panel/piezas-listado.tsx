@@ -18,6 +18,8 @@ import {
 } from "@/lib/formato";
 import type { ProductoListado } from "@/lib/tipos";
 import { BorrarProducto } from "./borrar-producto";
+import { Carrusel } from "@/components/carrusel";
+import { imagenesDeProducto, type ImagenDeProducto } from "./buscar-foto-acciones";
 
 /*
   El listado del inventario, con selección, previsualización y acciones.
@@ -78,11 +80,24 @@ function Dato({ etiqueta, children }: { etiqueta: string; children: React.ReactN
   );
 }
 
+/*
+  LAS IMÁGENES LLEGAN COMO PROP Y NO SE CARGAN ACÁ DENTRO.
+
+  La primera versión las pedía en un efecto al cambiar el producto, y el linter
+  lo rechazó con razón: esta carga no es una sincronización con nada externo,
+  es la consecuencia directa de que alguien apretó el ojo. Pedirlas en ese
+  gesto, donde se sabe de qué producto se trata, deja el efecto fuera y evita
+  el render extra con la vista vacía.
+*/
 function Previsualizacion({
   producto,
+  imagenes,
+  cargando,
   alCerrar,
 }: {
   producto: ProductoListado | null;
+  imagenes: ImagenDeProducto[];
+  cargando: boolean;
   alCerrar: () => void;
 }) {
   const dialogo = useRef<HTMLDialogElement>(null);
@@ -135,29 +150,38 @@ function Previsualizacion({
 
       <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,15rem)_1fr]">
-          {producto.foto_path ? (
-            <figure className="rounded-lg border border-gris-200 p-2">
-              {/*
-                La foto se pide a /panel/foto/[id], que la firma en el momento.
-                eslint-disable porque el optimizador de Next cachearía una URL
-                que deja de servir en cinco minutos.
-              */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+          {/*
+            Todas las imágenes, deslizables. Antes se veía solo la portada y
+            para mirar el reverso había que entrar a la ficha y volver: en una
+            revisión de veinte borradores eso son cuarenta navegaciones.
+
+            Mientras cargan se muestra la portada por /panel/foto/[id], que ya
+            está firmada de a una: así el recuadro no parpadea vacío.
+          */}
+          {cargando ? (
+            producto.foto_path ? (
+              /* eslint-disable-next-line @next/next/no-img-element -- URL firmada y efímera */
               <img
                 src={`/panel/foto/${producto.id}`}
                 alt={`Foto de ${producto.nombre}`}
-                loading="lazy"
-                className="mx-auto max-h-56 w-auto rounded"
+                className="mx-auto max-h-56 w-auto rounded border border-gris-200"
               />
-              {producto.ubicacion_en_foto ? (
-                <figcaption className="mt-2 text-center text-xs text-gris-500">
-                  En la foto: {producto.ubicacion_en_foto}
-                </figcaption>
-              ) : null}
-            </figure>
+            ) : (
+              <p className="flex items-center justify-center rounded-lg border border-gris-200 p-6 text-sm text-gris-500">
+                Cargando imágenes...
+              </p>
+            )
+          ) : imagenes.length > 0 ? (
+            <Carrusel
+              imagenes={imagenes.map((img, i) => ({
+                id: img.id,
+                url: img.url,
+                alt: `${producto.nombre}, imagen ${i + 1} de ${imagenes.length}`,
+              }))}
+            />
           ) : (
             <p className="flex items-center justify-center rounded-lg border border-gris-200 p-6 text-sm text-gris-500">
-              Sin foto
+              Sin imágenes
             </p>
           )}
 
@@ -474,6 +498,25 @@ export function ListaInventario({
 }) {
   const [marcados, setMarcados] = useState<string[]>([]);
   const [viendo, setViendo] = useState<ProductoListado | null>(null);
+  const [imagenesVista, setImagenesVista] = useState<ImagenDeProducto[]>([]);
+  const [cargandoVista, setCargandoVista] = useState(false);
+  /* Cuál es la petición vigente. Abriendo dos vistas rápidas seguidas, la
+     primera respuesta puede llegar última: sin esto, las imágenes de un
+     producto se pintarían sobre la vista de otro. */
+  const peticionVista = useRef(0);
+
+  const abrirVista = async (p: ProductoListado) => {
+    const mia = ++peticionVista.current;
+    setViendo(p);
+    setImagenesVista([]);
+    setCargandoVista(true);
+    try {
+      const { imagenes } = await imagenesDeProducto(p.id);
+      if (peticionVista.current === mia) setImagenesVista(imagenes);
+    } finally {
+      if (peticionVista.current === mia) setCargandoVista(false);
+    }
+  };
 
   /*
     LAS ACCIONES MASIVAS VIVEN ACÁ Y NO EN LA BARRA, aunque sea la barra la que
@@ -563,12 +606,23 @@ export function ListaInventario({
           const sinStock = Number(p.cantidad) <= 0;
 
           return (
+            /*
+              La fila es una columna que contiene una fila: arriba los datos,
+              abajo las acciones desplegadas. Así el panel de acciones empuja el
+              contenido hacia abajo en vez de flotar sobre él.
+
+              La primera versión lo tenía con position absolute y sin ningún
+              ancestro posicionado, así que se ubicaba respecto de la página
+              entera: en un teléfono aparecía en cualquier parte menos donde se
+              había apretado.
+            */
             <li
               key={p.id}
-              className={`flex items-center gap-3 p-3 transition-colors ${
+              className={`p-3 transition-colors ${
                 marcado ? "bg-primario/5" : "hover:bg-gris-50"
               }`}
             >
+              <div className="flex items-center gap-3">
               {puedeSeleccionar ? (
                 <input
                   type="checkbox"
@@ -603,6 +657,32 @@ export function ListaInventario({
                   {" · "}
                   {p.categoria_nombre ?? "Sin categoría"}
                   {p.ubicacion ? ` · ${p.ubicacion}` : ""}
+                </p>
+
+                {/*
+                  EN EL TELÉFONO, STOCK Y PRECIO VAN ACÁ ABAJO.
+
+                  La primera versión de esta fila los escondía con hidden
+                  sm:block y en un celular quedaban solo el nombre y el SKU: el
+                  inventario servía para ver que el producto existe y para nada
+                  más. Las dos cifras que alguien viene a mirar no pueden ser lo
+                  primero que se sacrifica por falta de ancho; lo que se
+                  sacrifica es la alineación en columnas, que es un lujo de
+                  pantalla grande.
+                */}
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:hidden">
+                  <span
+                    className={`font-bold ${sinStock ? "text-acento" : "text-gris-900"}`}
+                  >
+                    {sinStock ? "Sin stock" : `${formateaNumero(p.cantidad)} ${p.unidad}`}
+                  </span>
+                  <span className="text-gris-400">·</span>
+                  <span className="font-bold text-gris-900">{precio.valor}</span>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[0.65rem] font-bold tracking-wide uppercase ${pres.insignia}`}
+                  >
+                    {pres.etiqueta}
+                  </span>
                 </p>
               </div>
 
@@ -639,7 +719,7 @@ export function ListaInventario({
                   pierde la posición de la lista cada vez. */}
               <button
                 type="button"
-                onClick={() => setViendo(p)}
+                onClick={() => void abrirVista(p)}
                 aria-label={`Previsualizar ${p.nombre}`}
                 title="Previsualizar"
                 className="shrink-0 rounded-md border border-gris-300 p-2 text-gris-700 transition-colors hover:border-primario hover:text-primario"
@@ -649,24 +729,32 @@ export function ListaInventario({
                 </svg>
               </button>
 
+              </div>
+
               {/*
-                Las acciones de la fila van dentro de un <details>: con
-                cincuenta filas, cincuenta juegos de botones compiten entre sí
-                y con el contenido. Plegadas, la lista se lee; desplegadas,
-                están donde siempre estuvieron.
+                Las acciones van dentro de un <details>: con cincuenta filas,
+                cincuenta juegos de botones compiten entre sí y con el
+                contenido. Plegadas, la lista se lee; desplegadas, están donde
+                siempre estuvieron.
+
+                Ocupa el ancho completo debajo de la fila, no un panel flotante:
+                en un teléfono, los botones de cambiar estado y borrar no caben
+                en una burbuja al costado.
               */}
-              <details className="shrink-0">
-                <summary className="cursor-pointer rounded-md border border-gris-300 px-2 py-2 text-xs font-semibold text-gris-700 transition-colors hover:border-primario hover:text-primario">
-                  Acciones
-                </summary>
-                <div className="absolute right-4 z-10 mt-1 rounded-lg border border-gris-200 bg-blanco p-3 shadow-tarjeta">
-                  <AccionesFila
-                    producto={p}
-                    puedeOperar={puedeOperar}
-                    puedeBorrar={puedeBorrar}
-                  />
-                </div>
-              </details>
+              {puedeOperar || puedeBorrar ? (
+                <details className="mt-1">
+                  <summary className="inline-block cursor-pointer rounded-md px-2 py-1 text-xs font-semibold text-gris-600 transition-colors hover:text-primario">
+                    Acciones
+                  </summary>
+                  <div className="border-t border-gris-100">
+                    <AccionesFila
+                      producto={p}
+                      puedeOperar={puedeOperar}
+                      puedeBorrar={puedeBorrar}
+                    />
+                  </div>
+                </details>
+              ) : null}
             </li>
           );
         })}
@@ -686,7 +774,12 @@ export function ListaInventario({
         />
       ) : null}
 
-      <Previsualizacion producto={viendo} alCerrar={() => setViendo(null)} />
+      <Previsualizacion
+        producto={viendo}
+        imagenes={imagenesVista}
+        cargando={cargandoVista}
+        alCerrar={() => setViendo(null)}
+      />
     </div>
   );
 }

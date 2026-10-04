@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Camara } from "@/components/camara";
+import { Carrusel } from "@/components/carrusel";
 import type { ImagenProducto } from "@/lib/datos/imagenes";
 import {
   agregarImagenes,
@@ -144,6 +145,24 @@ export function Galeria({
             {MINIMO}. Mientras tanto este producto no se puede confirmar.
           </p>
         </div>
+      ) : null}
+
+      {/*
+        El visor deslizable va arriba de las miniaturas, no en vez de ellas.
+        Son dos tareas distintas: mirar la pieza en grande, que es lo primero
+        que alguien hace al abrir la ficha, y administrar el orden, que es una
+        tarea ocasional. Con solo miniaturas había que abrir cada una aparte
+        para verla; con solo visor no se podría reordenar.
+      */}
+      {ordenadas.length > 0 ? (
+        <Carrusel
+          className="mt-4"
+          imagenes={ordenadas.map((img, i) => ({
+            id: img.id,
+            url: img.url,
+            alt: `${nombre}, imagen ${i + 1} de ${ordenadas.length}`,
+          }))}
+        />
       ) : null}
 
       {ordenadas.length > 0 ? (

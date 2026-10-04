@@ -86,7 +86,7 @@ export async function buscarPorFoto(
     if (!count) {
       return {
         aviso:
-          "Todavía no hay imágenes medidas, así que no hay contra qué comparar. Un administrador tiene que indexarlas una vez desde Categorías.",
+          "Todavía no hay imágenes medidas, así que no hay contra qué comparar. Arriba en el inventario aparece el botón para medirlas: hay que correrlo una vez.",
         resultados: [],
       };
     }
@@ -159,7 +159,7 @@ export async function imagenesPorIndexar(
   limite = 40,
 ): Promise<{ imagenes: ImagenPorIndexar[]; faltan: number; error: string | null }> {
   try {
-    await requiereRol(PERMISOS.administrar);
+    await requiereRol(PERMISOS.operar);
   } catch (e) {
     return { imagenes: [], faltan: 0, error: e instanceof Error ? e.message : "No autorizado." };
   }
@@ -229,7 +229,7 @@ export async function guardarDescriptores(
   medidos: { imagen_id: string; producto_id: string; vector: number[] }[],
 ): Promise<{ guardados: number; error: string | null }> {
   try {
-    await requiereRol(PERMISOS.administrar);
+    await requiereRol(PERMISOS.operar);
   } catch (e) {
     return { guardados: 0, error: e instanceof Error ? e.message : "No autorizado." };
   }
@@ -261,4 +261,63 @@ export async function guardarDescriptores(
   }
 
   return { guardados: validos.length, error: null };
+}
+
+/* ── Imágenes de un producto, para la vista rápida ──────────────────────── */
+
+export type ImagenDeProducto = { id: string; url: string | null };
+
+/*
+  Las imágenes firmadas de UN producto.
+
+  SE PIDE AL ABRIR LA VISTA RÁPIDA y no al dibujar el listado, por la misma
+  razón que /panel/foto/[id] firma de a una: firmar las imágenes de cincuenta
+  productos para que alguien mire dos es gastar el trabajo y el tiempo de carga
+  en cuarenta y ocho que nadie va a ver.
+*/
+export async function imagenesDeProducto(
+  productoId: string,
+): Promise<{ imagenes: ImagenDeProducto[]; error: string | null }> {
+  const perfil = await perfilHabilitado();
+  if (!perfil) return { imagenes: [], error: "Necesitas iniciar sesión." };
+
+  const supabase = await crearClienteServidor();
+
+  const { data, error } = await supabase
+    .from("producto_imagenes")
+    .select("id, path, bucket")
+    .eq("producto_id", productoId)
+    .order("orden")
+    .order("created_at");
+
+  if (error) {
+    console.error("No pude leer las imágenes del producto:", error.message);
+    return { imagenes: [], error: "No pude leer las imágenes." };
+  }
+
+  const filas = (data ?? []) as { id: string; path: string; bucket: string }[];
+  if (filas.length === 0) return { imagenes: [], error: null };
+
+  const { data: firmas, error: errorFirma } = await supabase.storage
+    .from(filas[0].bucket)
+    .createSignedUrls(
+      filas.map((f) => f.path),
+      300,
+    );
+
+  if (errorFirma) {
+    console.error("No pude firmar las imágenes:", errorFirma.message);
+    return { imagenes: [], error: "No pude preparar las imágenes." };
+  }
+
+  const urlPorPath = new Map(
+    (firmas ?? [])
+      .filter((f) => f.path && f.signedUrl)
+      .map((f) => [f.path as string, f.signedUrl]),
+  );
+
+  return {
+    imagenes: filas.map((f) => ({ id: f.id, url: urlPorPath.get(f.path) ?? null })),
+    error: null,
+  };
 }

@@ -94,13 +94,19 @@ export default async function InventarioPage({
   };
 
   /*
-    Cuántas imágenes faltan por medir para la búsqueda por foto. Solo se
-    consulta para el administrador, que es el único que puede indexarlas:
-    preguntarlo para todos sería una consulta por cada carga de pantalla que
-    nadie más va a poder usar.
+    Cuántas imágenes faltan por medir para la búsqueda por foto.
+
+    LO VE QUIEN OPERA, no solo el administrador. Antes era solo de admin y eso
+    dejaba la búsqueda por foto muerta en la práctica: quien carga las fotos es
+    el operador, es el primero que nota que la búsqueda no encuentra nada, y
+    era el único que no podía arreglarlo. La política de la base siempre
+    permitió escribir a quien opera; la restricción estaba de más.
+
+    No se consulta para el lector: no puede medir nada y serían dos consultas
+    por cada carga de pantalla.
   */
   let faltanPorIndexar = 0;
-  if (esAdmin) {
+  if (puedeOperar) {
     const supabase = await crearClienteServidor();
     const [imagenes, medidas] = await Promise.all([
       supabase.from("producto_imagenes").select("id", { count: "exact", head: true }),
@@ -212,7 +218,7 @@ export default async function InventarioPage({
           sirve, y enterrarlo debajo del formulario lo haría invisible. */}
       <BuscarPorFoto />
 
-      {esAdmin && faltanPorIndexar > 0 ? (
+      {puedeOperar && faltanPorIndexar > 0 ? (
         <IndexarImagenes faltanInicial={faltanPorIndexar} />
       ) : null}
 
