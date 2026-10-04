@@ -369,3 +369,85 @@ export async function anularVenta(
   revalidatePath("/panel/delivery");
   return { ok: "Venta anulada. El stock volvió con un ajuste que quedó registrado." };
 }
+
+/*
+  Agregar al carrito a partir de un código escaneado.
+
+  ── QUÉ PUEDE TRAER EL CÓDIGO ──────────────────────────────────────────────
+
+  Las etiquetas que imprime esta aplicación llevan la URL de la ficha, así que
+  lo normal es ".../panel/productos/<uuid>". Pero alguien va a escanear tarde o
+  temprano una etiqueta vieja, una escrita a mano o un código de otro sistema,
+  y la pantalla tiene que responder algo útil en vez de quedarse muda.
+
+  Por eso se aceptan tres formas, en este orden:
+   1. Una URL de ficha de esta aplicación -> se saca el identificador.
+   2. Un identificador suelto.
+   3. Un SKU, que es lo que está impreso en texto debajo del código y lo que
+      alguien va a teclear si el código se borró.
+
+  Lo que no calce con ninguna devuelve un mensaje que dice qué se leyó. "Código
+  no reconocido" a secas obliga a adivinar si el problema fue la etiqueta, la
+  cámara o el producto.
+*/
+export async function agregarPorCodigo(
+  _p: EstadoVentaAccion,
+  datos: FormData,
+): Promise<EstadoVentaAccion> {
+  try {
+    await requiereRol(PERMISOS.operar);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "No autorizado." };
+  }
+
+  const ventaId = texto(datos, "venta_id");
+  const codigo = texto(datos, "codigo");
+  if (!ventaId) return { error: "Falta la venta." };
+  if (!codigo) return { error: "No leí ningún código." };
+
+  const supabase = await crearClienteServidor();
+
+  /* El identificador que viene en una URL de ficha, o el código suelto si ya
+     es un identificador. */
+  const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+  const enUrl = codigo.match(/\/panel\/productos\/([^/?#\s]+)/i)?.[1];
+  const posibleId = enUrl && UUID.test(enUrl) ? enUrl : UUID.test(codigo) ? codigo.match(UUID)?.[0] : null;
+
+  let productoId: string | null = posibleId ?? null;
+
+  if (!productoId) {
+    /* Por SKU. Va en mayúsculas porque así se emite y así está impreso. */
+    const { data, error } = await supabase
+      .from("productos")
+      .select("id")
+      .eq("sku", codigo.trim().toUpperCase())
+      .maybeSingle();
+
+    if (error) {
+      console.error("No pude buscar por SKU:", error.message);
+      return { error: "No pude leer el producto. Intenta de nuevo." };
+    }
+    productoId = (data as { id: string } | null)?.id ?? null;
+  }
+
+  if (!productoId) {
+    /* Se muestra lo leído, recortado: un código largo llenaría la pantalla, y
+       los primeros caracteres alcanzan para reconocer de dónde salió. */
+    const leido = codigo.length > 40 ? `${codigo.slice(0, 40)}...` : codigo;
+    return {
+      error: `Ese código no corresponde a ningún producto de este inventario. Leí: ${leido}`,
+    };
+  }
+
+  /*
+    De acá en adelante es exactamente el mismo camino que agregar desde la
+    búsqueda por texto: las validaciones de stock, de precio y de pieza única
+    tienen que ser las mismas sin importar cómo se eligió el producto.
+  */
+  const reenvio = new FormData();
+  reenvio.set("venta_id", ventaId);
+  reenvio.set("producto_id", productoId);
+  reenvio.set("cantidad", texto(datos, "cantidad") || "1");
+
+  return agregarAlCarrito({}, reenvio);
+}

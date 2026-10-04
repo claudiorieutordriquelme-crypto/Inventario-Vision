@@ -100,9 +100,29 @@ export default async function ProductoPage({
       ) : null}
 
       <div>
-        <Link href="/panel" className="text-sm font-semibold text-primario hover:underline">
-          Volver al inventario
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href="/panel" className="text-sm font-semibold text-primario hover:underline">
+            Volver al inventario
+          </Link>
+
+          {/*
+            La etiqueta se abre en otra pestaña: imprimir deja la ventana en un
+            estado raro y volver atrás desde ahí perdería la ficha que se estaba
+            revisando.
+          */}
+          <a
+            href={`/panel/productos/${producto.id}/etiqueta`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-md border border-gris-300 px-3 py-2 text-sm font-semibold text-gris-800 transition-colors hover:border-primario hover:text-primario"
+          >
+            <svg viewBox="0 0 24 24" className="size-4 shrink-0 fill-current" aria-hidden="true">
+              <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8 0h2v2h-2v-2zm4-2h2v2h2v2h-2v2h-2v2h-2v-2h-2v-2h2v-4h2v2h2v-2zm2 6h2v2h-2v-2z" />
+            </svg>
+            Imprimir etiqueta con código
+          </a>
+        </div>
+
 
         <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">

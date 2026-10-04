@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useCallback, useRef, useState } from "react";
 import {
   actualizarVenta,
   agregarAlCarrito,
+  agregarPorCodigo,
   anularVenta,
   cambiarCantidad,
   confirmarVenta,
@@ -20,6 +21,7 @@ import type {
 } from "@/lib/tipos";
 import type { ResultadoBusqueda } from "@/lib/datos/comercial";
 import { BuscarPorFoto } from "../../buscar-foto";
+import { LectorQr } from "@/components/lector-qr";
 
 const claseCampo =
   "mt-1.5 w-full rounded-md border border-gris-300 px-3 py-2.5 text-base text-gris-900 outline-none focus:border-primario focus:ring-2 focus:ring-primario/30";
@@ -175,6 +177,64 @@ export function BuscarFotoEnVenta({ ventaId }: { ventaId: string }) {
           }
         }}
       />
+
+      {pendiente ? (
+        <p aria-live="polite" className="mt-2 text-sm text-gris-600">
+          Agregando al carrito...
+        </p>
+      ) : null}
+      <Mensaje estado={estado} />
+    </div>
+  );
+}
+
+/*
+  Escanear la etiqueta de la pieza para agregarla al carrito.
+
+  ES EL CAMINO MÁS RÁPIDO DE LOS TRES, y por eso va primero. Buscar por nombre
+  exige acordarse de cómo se llama; buscar por foto exige que la pieza esté
+  medida y acierta por parecido. El código es exacto: apuntar y listo.
+
+  EL VISOR NO SE CIERRA AL LEER. En un mostrador se cargan tres o cuatro piezas
+  seguidas, y cerrar el visor después de cada una obliga a volver a abrirlo y a
+  esperar que la cámara arranque cada vez. Se queda abierto y va mostrando lo
+  que entró; se cierra cuando la persona decide.
+*/
+export function EscanearEnVenta({ ventaId }: { ventaId: string }) {
+  const [estado, accion, pendiente] = useActionState<EstadoVentaAccion, FormData>(
+    agregarPorCodigo,
+    {},
+  );
+  const [abierto, setAbierto] = useState(false);
+  const envio = useRef<HTMLFormElement>(null);
+  const campoCodigo = useRef<HTMLInputElement>(null);
+
+  const alLeer = useCallback((texto: string) => {
+    if (campoCodigo.current) {
+      campoCodigo.current.value = texto;
+      envio.current?.requestSubmit();
+    }
+  }, []);
+
+  return (
+    <div>
+      <form ref={envio} action={accion} className="hidden">
+        <input type="hidden" name="venta_id" value={ventaId} />
+        <input ref={campoCodigo} type="hidden" name="codigo" />
+      </form>
+
+      {abierto ? <LectorQr alLeer={alLeer} alCerrar={() => setAbierto(false)} /> : null}
+
+      <button
+        type="button"
+        onClick={() => setAbierto(true)}
+        className="inline-flex items-center gap-2 rounded-md bg-primario px-4 py-2.5 text-sm font-semibold text-blanco transition-opacity hover:opacity-90"
+      >
+        <svg viewBox="0 0 24 24" className="size-4 shrink-0 fill-current" aria-hidden="true">
+          <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8 0h2v2h-2v-2zm4-2h2v2h2v2h-2v2h-2v2h-2v-2h-2v-2h2v-4h2v2h2v-2zm2 6h2v2h-2v-2z" />
+        </svg>
+        Escanear etiqueta
+      </button>
 
       {pendiente ? (
         <p aria-live="polite" className="mt-2 text-sm text-gris-600">

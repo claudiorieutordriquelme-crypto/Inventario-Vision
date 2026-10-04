@@ -15,6 +15,7 @@ import type { DireccionCliente } from "@/lib/tipos";
 import {
   Anular,
   BuscarFotoEnVenta,
+  EscanearEnVenta,
   Carrito,
   Cobrar,
   DatosVenta,
@@ -128,9 +129,13 @@ export default async function VentaPage({
             Buscar productos
           </h2>
 
-          {/* La foto va primero: con la pieza en la mano y el cliente
-              esperando, es el camino que no exige acordarse del nombre. */}
-          <div className="mt-3">
+          {/*
+            Los tres caminos, en orden de qué tan rápido resuelven con la pieza
+            en la mano: el código es exacto, la foto acierta por parecido, y el
+            texto exige acordarse del nombre.
+          */}
+          <div className="mt-3 flex flex-wrap items-start gap-3">
+            <EscanearEnVenta ventaId={venta.id} />
             <BuscarFotoEnVenta ventaId={venta.id} />
           </div>
           <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
