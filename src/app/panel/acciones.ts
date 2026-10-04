@@ -329,7 +329,13 @@ export async function analizarYCrear(_p: EstadoAccion, datos: FormData): Promise
   }
 
   revalidatePath("/panel");
-  redirect(`/panel/productos/${productoId}`);
+  /*
+    El aviso de "registrado" viaja en la dirección y no en el estado de la
+    acción, porque acá hay un redirect: el estado que devuelve una Server
+    Action se pierde al navegar, así que la ficha llegaría sin nada que
+    confirmara el alta. Con el parámetro, la ficha lo dibuja al cargar.
+  */
+  redirect(`/panel/productos/${productoId}?registrado=1`);
 }
 
 /*

@@ -20,8 +20,15 @@ import { EditarProducto, RegistrarMovimiento, ZonaBorrado } from "./piezas";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProductoPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ registrado?: string }>;
+}) {
   const { id } = await params;
+  const { registrado } = await searchParams;
 
   const [{ producto, movimientos, error }, perfil, { categorias }] = await Promise.all([
     obtenerProducto(id),
@@ -65,6 +72,33 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-8">
+      {/*
+        Confirmación del alta.
+
+        VA ARRIBA DE TODO Y CON role="status", no como un aviso que se desvanece
+        solo. Dos razones: quien acaba de cargar llega acá con la pieza todavía
+        en la mano y necesita ver que quedó guardada antes de soltarla, y un
+        mensaje que se borra a los tres segundos es invisible para quien usa
+        lector de pantalla o se distrajo. Se va al navegar, que es cuando ya
+        cumplió.
+
+        Dice además lo que sigue, porque el producto queda en BORRADOR: sin eso,
+        "registrado" se lee como "terminado" y nadie vuelve a revisarlo.
+      */}
+      {registrado ? (
+        <div role="status" className="flex overflow-hidden rounded-lg border border-primario">
+          <div className="w-2 shrink-0 bg-primario" aria-hidden="true" />
+          <div className="min-w-0 flex-1 px-4 py-3">
+            <p className="text-base font-bold text-gris-900">Producto registrado</p>
+            <p className="mt-1 text-sm text-gris-600">
+              Quedó en borrador con el SKU{" "}
+              <span className="font-mono font-semibold">{producto.sku}</span>. Revisa
+              los datos de abajo y confírmalo cuando estén correctos.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div>
         <Link href="/panel" className="text-sm font-semibold text-primario hover:underline">
           Volver al inventario
