@@ -3,6 +3,13 @@ import { perfilHabilitado } from "@/lib/auth";
 import { LIMITE_EXPORTACION, listarProductos } from "@/lib/datos/inventario";
 import { ETIQUETA_ESTADO } from "@/lib/formato";
 import type { EstadoProducto, ProductoListado } from "@/lib/tipos";
+/*
+  El armado del CSV vive en lib/csv desde que hubo una segunda exportación. Lo
+  importante de compartirlo no es ahorrar líneas: es que la defensa contra
+  inyección de fórmulas de Excel exista UNA vez. Con dos copias, el día que una
+  se corrija la otra queda abierta y nadie se entera.
+*/
+import { BOM, SALTO, SEPARADOR, celdaFecha, celdaNumero, celdaTexto } from "@/lib/csv";
 
 export const dynamic = "force-dynamic";
 
@@ -54,10 +61,6 @@ export const dynamic = "force-dynamic";
   modelo en un dato de gestión que nadie vuelve a cuestionar.
 */
 
-const SEPARADOR = ";";
-const BOM = "﻿";
-/* Excel espera fin de línea de Windows en un CSV. */
-const SALTO = "\r\n";
 
 const COLUMNAS = [
   "SKU",
@@ -79,33 +82,6 @@ const COLUMNAS = [
   "Última modificación",
   "Notas",
 ];
-
-/** Caracteres con los que Excel empieza a interpretar una celda como fórmula. */
-const PELIGROSOS = /^[=+\-@\t\r]/;
-
-function celdaTexto(valor: string | null | undefined): string {
-  if (valor === null || valor === undefined || valor === "") return "";
-  const limpio = PELIGROSOS.test(valor) ? `'${valor}` : valor;
-  /* Las comillas internas se duplican, que es como el formato CSV las escapa. */
-  return `"${limpio.replace(/"/g, '""')}"`;
-}
-
-function celdaNumero(valor: number | null | undefined, decimales = 0): string {
-  if (valor === null || valor === undefined || !Number.isFinite(Number(valor))) return "";
-  /* Sin comillas para que Excel lo tome como número, y con coma decimal. */
-  return Number(valor).toFixed(decimales).replace(".", ",");
-}
-
-function celdaFecha(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mi = String(d.getMinutes()).padStart(2, "0");
-  return celdaTexto(`${dd}-${mm}-${d.getFullYear()} ${hh}:${mi}`);
-}
 
 function procedencia(p: ProductoListado): string {
   if (p.precio_confirmado_clp !== null) return "Fijado por una persona";

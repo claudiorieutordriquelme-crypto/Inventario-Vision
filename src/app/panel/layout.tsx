@@ -21,6 +21,9 @@ const SECCIONES: Seccion[] = [
     lo que existe un rol de solo lectura. Qué puede tocar cada quien lo decide
     cada pantalla, y antes que eso, las políticas de la base.
   */
+  /* Cerebro va junto a Inventario y antes de las secciones operativas: es la
+     pantalla con la que se empieza el día, no una herramienta de trabajo. */
+  { nombre: "Cerebro", ruta: "/panel/cerebro", roles: ["admin", "operador", "lector"] },
   { nombre: "Venta", ruta: "/panel/venta", roles: ["admin", "operador", "lector"] },
   { nombre: "Delivery", ruta: "/panel/delivery", roles: ["admin", "operador", "lector"] },
   { nombre: "Clientes", ruta: "/panel/clientes", roles: ["admin", "operador", "lector"] },

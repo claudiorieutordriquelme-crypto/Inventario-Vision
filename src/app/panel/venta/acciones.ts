@@ -48,7 +48,21 @@ function traduce(codigo: string | undefined, mensaje: string): string {
   return "No pude guardar. Intenta de nuevo.";
 }
 
-/** Abre un carrito nuevo y lleva a él. */
+/*
+  Abre un carrito y lleva a él.
+
+  REUSA EL BORRADOR VACÍO QUE YA EXISTA, en vez de crear uno nuevo cada vez.
+
+  El defecto apareció mirando los datos reales: había cuatro ventas, las cuatro
+  en borrador y las cuatro con total cero. O sea cuatro carritos abiertos y
+  abandonados, uno por cada vez que alguien apretó "Nueva venta" para mirar la
+  pantalla. Cada uno consumió un folio del correlativo y quedó ensuciando el
+  listado de ventas para siempre.
+
+  Solo se reusa si está VACÍO. Un borrador con productos adentro es trabajo de
+  alguien que quedó a medias, y llevarlo ahí sin avisar le mezclaría su carrito
+  con la venta nueva.
+*/
 export async function abrirVenta(): Promise<void> {
   let perfilId: string;
   try {
@@ -59,6 +73,28 @@ export async function abrirVenta(): Promise<void> {
   }
 
   const supabase = await crearClienteServidor();
+
+  const { data: vacias } = await supabase
+    .from("ventas")
+    .select("id, venta_items(count)")
+    .eq("estado", "borrador")
+    .eq("vendedor_id", perfilId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  const sinProductos = ((vacias ?? []) as unknown as {
+    id: string;
+    venta_items: { count: number }[] | { count: number } | null;
+  }[]).find((v) => {
+    const c = Array.isArray(v.venta_items) ? v.venta_items[0] : v.venta_items;
+    return Number(c?.count ?? 0) === 0;
+  });
+
+  if (sinProductos) {
+    revalidatePath("/panel/venta");
+    redirect(`/panel/venta/${sinProductos.id}`);
+  }
+
   const { data, error } = await supabase
     .from("ventas")
     .insert({ vendedor_id: perfilId })
