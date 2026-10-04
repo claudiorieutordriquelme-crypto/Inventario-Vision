@@ -133,3 +133,108 @@ export function procedenciaPrecio(
   }
   return { valor: "Sin precio", origen: "Nadie lo ha cargado", revisar: true };
 }
+
+/* ── Venta y despacho ────────────────────────────────────────────────────── */
+
+import type {
+  CanalVenta,
+  EstadoDespacho,
+  EstadoVenta,
+  MedioPago,
+  TipoComprobante,
+  TipoEntrega,
+} from "@/lib/tipos";
+
+export const ETIQUETA_CANAL: Record<CanalVenta, string> = {
+  tienda: "Tienda",
+  live: "Venta live",
+};
+
+export const ETIQUETA_ENTREGA: Record<TipoEntrega, string> = {
+  retiro_tienda: "Retiro en tienda",
+  despacho: "Despacho",
+};
+
+export const ETIQUETA_PAGO: Record<MedioPago, string> = {
+  efectivo: "Efectivo",
+  debito: "Débito",
+  credito: "Crédito",
+  transferencia: "Transferencia",
+  otro: "Otro",
+};
+
+export const ETIQUETA_COMPROBANTE: Record<TipoComprobante, string> = {
+  ninguno: "Sin comprobante",
+  boleta: "Boleta",
+  factura: "Factura",
+};
+
+/*
+  Presentación de cada estado de venta y de despacho.
+
+  MISMA REGLA QUE EN EL INVENTARIO: el estado nunca se comunica solo por color.
+  Cada uno lleva su etiqueta escrita, porque el color es lo primero que se
+  pierde con daltonismo o con una pantalla vista a contraluz.
+*/
+export const PRESENTACION_VENTA: Record<
+  EstadoVenta,
+  { etiqueta: string; insignia: string; explica: string }
+> = {
+  borrador: {
+    etiqueta: "Borrador",
+    /* Ámbar de marca con texto negro: 10:1 medido. Un carrito abierto pide
+       atención, no es un error, y el rojo está reservado para lo que destruye. */
+    insignia: "bg-marca text-negro",
+    explica: "Carrito abierto. Todavía no descuenta stock.",
+  },
+  confirmada: {
+    etiqueta: "Confirmada",
+    insignia: "bg-primario text-blanco",
+    explica: "Se cobró y el stock ya salió del inventario.",
+  },
+  anulada: {
+    etiqueta: "Anulada",
+    insignia: "bg-gris-200 text-gris-700",
+    explica: "Se deshizo con un ajuste que devolvió el stock. Queda registrada.",
+  },
+};
+
+export const PRESENTACION_DESPACHO: Record<
+  EstadoDespacho,
+  { etiqueta: string; insignia: string; explica: string }
+> = {
+  pendiente: {
+    etiqueta: "Pendiente",
+    insignia: "bg-marca text-negro",
+    explica: "Recién creado. Falta armar las cajas.",
+  },
+  embalado: {
+    etiqueta: "Embalado",
+    insignia: "bg-gris-800 text-blanco",
+    explica: "Las cajas están armadas y rotuladas, listas para salir.",
+  },
+  en_ruta: {
+    etiqueta: "En ruta",
+    insignia: "bg-primario text-blanco",
+    explica: "Salió a reparto. Todavía no llega.",
+  },
+  entregado: {
+    etiqueta: "Entregado",
+    insignia: "bg-gris-200 text-gris-700",
+    explica: "Llegó a destino. Las ventas de este despacho ya no se anulan.",
+  },
+  anulado: {
+    etiqueta: "Anulado",
+    insignia: "bg-gris-200 text-gris-700",
+    explica: "Se dejó sin efecto, normalmente porque su venta se anuló.",
+  },
+};
+
+/* El orden en que avanza un despacho. anulado queda fuera: no es un paso del
+   camino, es salirse de él. */
+export const FLUJO_DESPACHO: EstadoDespacho[] = [
+  "pendiente",
+  "embalado",
+  "en_ruta",
+  "entregado",
+];

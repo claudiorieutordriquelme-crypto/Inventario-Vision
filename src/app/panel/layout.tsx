@@ -15,6 +15,15 @@ type Seccion = ItemNav & { roles: Rol[] };
 const SECCIONES: Seccion[] = [
   { nombre: "Inventario", ruta: "/panel", roles: ["admin", "operador", "lector"] },
   { nombre: "Nuevo con foto", ruta: "/panel/nuevo", roles: ["admin", "operador"] },
+  /*
+    Venta, Delivery y Clientes los VE también el lector, que no puede cambiar
+    nada en ellas: saber qué se vendió y dónde va un pedido es justamente para
+    lo que existe un rol de solo lectura. Qué puede tocar cada quien lo decide
+    cada pantalla, y antes que eso, las políticas de la base.
+  */
+  { nombre: "Venta", ruta: "/panel/venta", roles: ["admin", "operador", "lector"] },
+  { nombre: "Delivery", ruta: "/panel/delivery", roles: ["admin", "operador", "lector"] },
+  { nombre: "Clientes", ruta: "/panel/clientes", roles: ["admin", "operador", "lector"] },
   { nombre: "Categorías", ruta: "/panel/categorias", roles: ["admin"] },
   { nombre: "Usuarios", ruta: "/panel/usuarios", roles: ["admin"] },
   /* La guía va al final y la ve todo el mundo: es lo que hay que poder

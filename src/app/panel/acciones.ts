@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { PERMISOS, requiereRol } from "@/lib/auth";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
-import { analizaImagen, esMimeSoportado } from "@/lib/vision";
+import {
+  analizaImagen,
+  esMimeSoportado,
+  MAXIMO_IMAGENES,
+  type MimeImagen,
+} from "@/lib/vision";
 
 export type EstadoAccion = { error?: string; ok?: string };
 
@@ -42,6 +47,20 @@ function traduce(codigo: string | undefined, mensaje: string): string {
     if (mensaje.includes("nombre_no_vacio")) {
       return "El producto necesita un nombre.";
     }
+    if (mensaje.includes("anio_razonable")) {
+      return "El año aproximado tiene que estar entre 1500 y 2100.";
+    }
+    if (mensaje.includes("medidas_positivas")) {
+      return "Las medidas, si las cargas, tienen que ser mayores que cero.";
+    }
+    /*
+      El trigger de pieza única. El mensaje de la base ya nombra el producto y
+      la cantidad, y está escrito para que lo lea una persona: se devuelve tal
+      cual en vez de reemplazarlo por uno genérico que pierde el dato.
+    */
+    if (mensaje.includes("pieza unica")) {
+      return mensaje;
+    }
     return "Los datos no cumplen una regla de la base.";
   }
   console.error("Error de base en inventario:", mensaje);
@@ -49,26 +68,32 @@ function traduce(codigo: string | undefined, mensaje: string): string {
 }
 
 /*
-  Alta de productos a partir de una foto. UNA FOTO PUEDE DAR VARIOS.
+  Alta de UN producto a partir de varias fotos de la misma pieza.
 
-  EL FLUJO ES DE UN SOLO PASO Y TERMINA EN LA REVISIÓN. Se sube la foto, se
-  analiza, se crean los productos en estado BORRADOR y se lleva a la persona a
-  revisarlos. No hay una pantalla intermedia de "confirma estos datos antes de
-  guardar", y es deliberado: esa pantalla obliga a decidir con la foto todavía
-  en la mano, y si alguien cierra la pestaña se pierde el análisis que ya se
-  pagó.
+  CAMBIÓ EL CRITERIO, Y ES EL CAMBIO MÁS GRANDE QUE HA TENIDO ESTA FUNCIÓN.
+  Antes una foto podía dar hasta doce productos: se apoyaban seis cosas en una
+  mesa, una foto, seis borradores. Ahora las fotos son de UNA pieza, el
+  análisis cataloga solo la que está al centro, e ignora el fondo.
 
-  El estado borrador existe justamente para esto: los productos ya están
-  cargados y buscables, y llevan escrito que nadie los ha revisado.
+  POR QUÉ. Para vender una pieza usada hacen falta tres imágenes de ESA pieza:
+  el frente, el reverso, el detalle. Con el criterio anterior, esas tres fotos
+  producían tres productos distintos del mismo objeto, y había que borrar dos.
+  El fondo de una bodega llena, además, entraba al catálogo como mercadería.
 
-  A DÓNDE SE LLEGA DESPUÉS depende de cuántos salieron. Con uno, directo a su
-  ficha, porque una pantalla de revisión de un solo elemento es un clic de más.
-  Con varios, a la pantalla de revisión, que los muestra junto a la foto con la
-  ubicación de cada uno: sin eso nadie sabría cuál de los seis es cuál.
+  LAS FOTOS VAN JUNTAS AL MODELO, en una sola llamada. Entre todas describen
+  una pieza; de a una producirían tres fichas del mismo objeto. Y cuesta menos:
+  un prompt de sistema en vez de tres.
 
-  SI EL ANÁLISIS FALLA, se crea igual UN producto con la foto y sin datos. La
-  foto es lo que costó ir a la bodega a tomar; perderla porque el modelo no
-  respondió sería perder el trabajo de campo por una falla de red.
+  EL FLUJO ES DE UN SOLO PASO Y TERMINA EN LA FICHA. Se suben las fotos, se
+  analiza, se crea el producto en estado BORRADOR y se lleva a la persona a su
+  ficha. No hay pantalla intermedia de "confirma estos datos antes de guardar",
+  y es deliberado: esa pantalla obliga a decidir con la pieza todavía en la
+  mano, y si alguien cierra la pestaña se pierde el análisis que ya se pagó.
+
+  SI EL ANÁLISIS FALLA, se crea igual el producto con sus fotos y sin datos.
+  Las fotos son lo que costó ir a buscar la pieza y fotografiarla; perderlas
+  porque el modelo no respondió sería perder el trabajo de campo por una falla
+  de red.
 */
 export async function analizarYCrear(_p: EstadoAccion, datos: FormData): Promise<EstadoAccion> {
   let perfilId: string;
@@ -79,39 +104,75 @@ export async function analizarYCrear(_p: EstadoAccion, datos: FormData): Promise
     return { error: e instanceof Error ? e.message : "No autorizado." };
   }
 
-  const archivo = datos.get("foto");
-  if (!(archivo instanceof File) || archivo.size === 0) {
-    return { error: "Elige una foto." };
+  /*
+    Varias fotos bajo el mismo nombre de campo. getAll y no get: con get solo
+    llegaría la primera y las otras dos se perderían en silencio, que es la
+    peor forma de perder algo.
+  */
+  const archivos = datos
+    .getAll("fotos")
+    .filter((a): a is File => a instanceof File && a.size > 0);
+
+  if (archivos.length === 0) {
+    return { error: "Saca o elige al menos una foto." };
   }
-  if (archivo.size > TAMANO_MAXIMO) {
-    return { error: "La foto supera los 10 MB. Sácala con menos resolución o comprímela." };
+  if (archivos.length > MAXIMO_IMAGENES) {
+    return { error: `Son demasiadas fotos. El máximo por producto es ${MAXIMO_IMAGENES}.` };
   }
-  if (!esMimeSoportado(archivo.type)) {
-    return {
-      error: `No puedo leer un archivo de tipo ${archivo.type || "desconocido"}. Usa JPG, PNG o WebP.`,
-    };
+
+  /*
+    La validación deja además el mime ya estrechado al tipo que acepta el
+    análisis. Sin esta lista, más abajo habría que volver a comprobarlo o
+    forzar el tipo, y forzarlo es desactivar justo la comprobación que evita
+    mandarle al modelo un archivo que no puede leer.
+  */
+  const validados: { archivo: File; mime: MimeImagen }[] = [];
+  for (const archivo of archivos) {
+    if (archivo.size > TAMANO_MAXIMO) {
+      return { error: "Una de las fotos supera los 10 MB. Sácala con menos resolución." };
+    }
+    if (!esMimeSoportado(archivo.type)) {
+      return {
+        error: `No puedo leer un archivo de tipo ${archivo.type || "desconocido"}. Usa JPG, PNG o WebP.`,
+      };
+    }
+    validados.push({ archivo, mime: archivo.type });
   }
 
   const supabase = await crearClienteServidor();
 
   /*
-    La ruta lleva un identificador aleatorio y no el nombre original. Dos fotos
-    llamadas IMG_0001.jpg son lo normal cuando se descarga de un teléfono, y
-    con el nombre original la segunda pisaría a la primera.
+    Cada ruta lleva un identificador aleatorio y no el nombre original. Dos
+    fotos llamadas IMG_0001.jpg son lo normal cuando se descarga de un
+    teléfono, y con el nombre original la segunda pisaría a la primera.
   */
-  const extension = archivo.name.includes(".") ? archivo.name.split(".").pop() : "jpg";
-  const ruta = `productos/${crypto.randomUUID()}.${extension}`;
+  const subidas: { ruta: string; mime: MimeImagen; bytes: Buffer; peso: number }[] = [];
 
-  const bytes = Buffer.from(await archivo.arrayBuffer());
+  for (const { archivo, mime } of validados) {
+    const extension = archivo.name.includes(".") ? archivo.name.split(".").pop() : "jpg";
+    const ruta = `productos/${crypto.randomUUID()}.${extension}`;
+    const bytes = Buffer.from(await archivo.arrayBuffer());
 
-  const { error: errorSubida } = await supabase.storage
-    .from("fotos")
-    .upload(ruta, bytes, { contentType: archivo.type, upsert: false });
+    const { error: errorSubida } = await supabase.storage
+      .from("fotos")
+      .upload(ruta, bytes, { contentType: mime, upsert: false });
 
-  if (errorSubida) {
-    console.error("No pude subir la foto:", errorSubida.message);
-    return { error: "No pude guardar la foto. Revisa el formato y vuelve a intentar." };
+    if (errorSubida) {
+      console.error("No pude subir una foto:", errorSubida.message);
+      /* Lo ya subido se limpia: archivos sueltos que nadie referencia ocupan
+         espacio y no se pueden encontrar después. */
+      if (subidas.length > 0) {
+        await supabase.storage.from("fotos").remove(subidas.map((s) => s.ruta));
+      }
+      return { error: "No pude guardar las fotos. Revisa el formato y vuelve a intentar." };
+    }
+
+    subidas.push({ ruta, mime, bytes, peso: archivo.size });
   }
+
+  const limpiarSubidas = async () => {
+    await supabase.storage.from("fotos").remove(subidas.map((s) => s.ruta));
+  };
 
   const { data: categorias } = await supabase
     .from("categorias")
@@ -120,27 +181,30 @@ export async function analizarYCrear(_p: EstadoAccion, datos: FormData): Promise
     .order("orden");
 
   const resultado = await analizaImagen(
-    bytes,
-    archivo.type,
+    subidas.map((s) => ({ datos: s.bytes, mime: s.mime })),
     (categorias ?? []) as { codigo: string; nombre: string; descripcion: string | null }[],
   );
 
-  const detectados = resultado.ok ? resultado.analisis.productos : [];
+  const detectado = resultado.ok ? resultado.analisis.producto : null;
 
   /*
     La bitácora se escribe PRIMERO y siempre, también cuando el análisis falló.
-    Primero porque los productos apuntan a ella, y siempre porque un registro
-    que solo guarda los aciertos no sirve para saber qué tan bien funciona esto.
+    Primero porque el producto apunta a ella, y siempre porque un registro que
+    solo guarda los aciertos no sirve para saber qué tan bien funciona esto.
+
+    foto_path guarda la PRIMERA foto. La bitácora registra una llamada, y una
+    llamada puede llevar varias imágenes; la primera alcanza para saber de qué
+    análisis se trata al revisarlo después.
   */
   const { data: analisisCreado, error: errorAnalisis } = await supabase
     .from("analisis_imagen")
     .insert({
-      foto_path: ruta,
+      foto_path: subidas[0].ruta,
       modelo: resultado.ok ? resultado.modelo : "ninguno",
       version_prompt: resultado.ok ? resultado.versionPrompt : "ninguno",
       respuesta: resultado.ok ? (resultado.bruto as object) : { error: resultado.error },
-      confianza: null,
-      productos_detectados: detectados.length,
+      confianza: detectado?.confianza ?? null,
+      productos_detectados: detectado ? 1 : 0,
       tokens_entrada: resultado.ok ? resultado.tokensEntrada : null,
       tokens_salida: resultado.ok ? resultado.tokensSalida : null,
       costo_usd: resultado.ok ? resultado.costoUsd : null,
@@ -156,135 +220,116 @@ export async function analizarYCrear(_p: EstadoAccion, datos: FormData): Promise
   }
   const analisisId = (analisisCreado as { id: string } | null)?.id ?? null;
 
-  /*
-    Los códigos de categoría se resuelven a id en UNA consulta para toda la
-    foto, no una por producto. Con doce productos serían doce viajes a la base
-    para leer una tabla de once filas.
-  */
-  const { data: todasCategorias } = await supabase.from("categorias").select("id, codigo");
-  const idPorCodigo = new Map(
-    ((todasCategorias ?? []) as { id: string; codigo: string }[]).map((c) => [c.codigo, c.id]),
-  );
+  let categoriaId: string | null = null;
+  if (detectado?.categoria_codigo) {
+    const { data: categoria } = await supabase
+      .from("categorias")
+      .select("id")
+      .eq("codigo", detectado.categoria_codigo)
+      .maybeSingle();
+    categoriaId = (categoria as { id: string } | null)?.id ?? null;
+  }
 
   /*
-    El tipo va explícito: sin él, TypeScript infiere el literal "ia" de la
-    primera rama y rechaza "manual" de la segunda, aunque las dos sean valores
-    válidos de la misma columna.
+    El producto nace SIN foto_path. Esa columna pasó a ser derivada: la escribe
+    el trigger de producto_imagenes con la portada, igual que cantidad la
+    escribe el trigger del libro de movimientos. Dos escritores sobre el mismo
+    dato terminan, siempre, en dos datos que no coinciden.
   */
-  type FilaNueva = {
-    nombre: string;
-    descripcion: string;
-    categoria_id: string | null;
-    unidad: string;
-    precio_estimado_clp: number | null;
-    origen: "ia" | "manual";
-    notas: string | null;
-    estado: "borrador";
-    foto_path: string;
-    foto_bucket: string;
-    analisis_id: string | null;
-    indice_en_foto: number;
-    ubicacion_en_foto: string;
-    creado_por: string;
-  };
-
-  /*
-    Cuando no se reconoció nada se crea UN borrador vacío con la foto. El caso
-    cubre las dos formas de no reconocer: que el análisis falle, y que funcione
-    pero la foto no muestre productos identificables.
-  */
-  const aInsertar: FilaNueva[] =
-    detectados.length > 0
-      ? detectados.map((p, i) => ({
-          nombre: p.nombre.slice(0, 200),
-          descripcion: p.descripcion,
-          categoria_id: p.categoria_codigo ? (idPorCodigo.get(p.categoria_codigo) ?? null) : null,
-          unidad: p.unidad || "unidad",
-          precio_estimado_clp: p.precio_estimado_clp,
-          origen: "ia",
-          notas: p.advertencias.length > 0 ? `Revisar: ${p.advertencias.join(" · ")}` : null,
-          estado: "borrador",
-          foto_path: ruta,
-          foto_bucket: "fotos",
-          analisis_id: analisisId,
-          indice_en_foto: i + 1,
-          ubicacion_en_foto: p.ubicacion_en_foto,
-          creado_por: perfilId,
-        }))
-      : [
-          {
-            nombre: "Sin identificar",
-            descripcion: resultado.ok
-              ? "El análisis no reconoció ningún producto en esta foto. Completa los datos a mano."
-              : "El análisis de la foto no se pudo completar. Completa los datos a mano.",
-            categoria_id: null,
-            unidad: "unidad",
-            precio_estimado_clp: null,
-            origen: "manual",
-            notas: resultado.ok ? resultado.analisis.observacion_general || null : resultado.error,
-            estado: "borrador",
-            foto_path: ruta,
-            foto_bucket: "fotos",
-            analisis_id: analisisId,
-            indice_en_foto: 1,
-            ubicacion_en_foto: "toda la imagen",
-            creado_por: perfilId,
-          },
-        ];
-
-  /*
-    Un solo INSERT con todas las filas. Insertar de a una dejaría, ante un
-    fallo a mitad de camino, la foto cargada con tres productos de seis y sin
-    forma de saber cuáles faltan.
-  */
-  const { data: creados, error } = await supabase
+  const { data: creado, error } = await supabase
     .from("productos")
-    .insert(aInsertar)
-    .select("id");
+    .insert({
+      nombre: detectado ? detectado.nombre.slice(0, 200) : "Sin identificar",
+      descripcion: detectado
+        ? detectado.descripcion
+        : resultado.ok
+          ? "El análisis no reconoció ninguna pieza al centro de las fotos. Completa los datos a mano."
+          : "El análisis de las fotos no se pudo completar. Completa los datos a mano.",
+      categoria_id: categoriaId,
+      unidad: detectado?.unidad || "unidad",
+      precio_estimado_clp: detectado?.precio_estimado_clp ?? null,
+      origen: detectado ? "ia" : "manual",
+      notas: detectado
+        ? detectado.advertencias.length > 0
+          ? `Revisar: ${detectado.advertencias.join(" · ")}`
+          : null
+        : resultado.ok
+          ? resultado.analisis.observacion_general || null
+          : resultado.error,
+      estado: "borrador",
+      /* Los atributos del rubro, cuando las fotos alcanzaron para verlos. */
+      estado_conservacion: detectado?.estado_conservacion ?? null,
+      material: detectado?.material ?? null,
+      epoca: detectado?.epoca ?? null,
+      analisis_id: analisisId,
+      indice_en_foto: 1,
+      creado_por: perfilId,
+    })
+    .select("id")
+    .single();
 
   if (error) {
-    /* Sin productos, el archivo es basura que nadie va a encontrar. */
-    await supabase.storage.from("fotos").remove([ruta]);
+    /* Sin producto, los archivos son basura que nadie va a encontrar. */
+    await limpiarSubidas();
     return { error: traduce(error.code, error.message) };
   }
 
-  const ids = ((creados ?? []) as { id: string }[]).map((p) => p.id);
+  const productoId = (creado as { id: string }).id;
 
   /*
-    Los conteos van por el libro de movimientos y no escribiendo cantidad: la
-    cantidad es la suma de su libro, siempre, y saltarse el libro una sola vez
-    rompe esa garantía.
+    Las imágenes, en el orden en que se sacaron. La primera es la portada, y
+    ese orden lo decidió quien fotografió: la foto de frente va primero porque
+    se saca primero.
   */
-  const ingresos = detectados
-    .map((p, i) =>
-      p.cantidad_visible && p.cantidad_visible > 0 && ids[i]
-        ? {
-            producto_id: ids[i],
-            tipo: "ingreso" as const,
-            cantidad: p.cantidad_visible,
-            motivo: "Conteo inicial estimado desde la foto. Revisar.",
-            creado_por: perfilId,
-          }
-        : null,
-    )
-    .filter((m): m is NonNullable<typeof m> => m !== null);
+  const { error: errorImagenes } = await supabase.from("producto_imagenes").insert(
+    subidas.map((s, i) => ({
+      producto_id: productoId,
+      path: s.ruta,
+      bucket: "fotos",
+      orden: i,
+      mime: s.mime,
+      bytes: s.peso,
+      creado_por: perfilId,
+    })),
+  );
 
-  if (ingresos.length > 0) {
-    const { error: errorMov } = await supabase.from("movimientos_inventario").insert(ingresos);
+  if (errorImagenes) {
+    /*
+      El producto quedó sin ninguna imagen registrada, que es peor que no
+      tenerlo: aparecería vacío en el listado y nadie sabría que sus fotos
+      están en el bucket. Se deshace entero.
+    */
+    console.error("No pude registrar las imágenes:", errorImagenes.message);
+    await supabase.from("productos").delete().eq("id", productoId);
+    await limpiarSubidas();
+    return { error: "No pude guardar las fotos del producto. Intenta de nuevo." };
+  }
+
+  /*
+    El conteo inicial va por el libro de movimientos y no escribiendo cantidad:
+    la cantidad es la suma de su libro, siempre, y saltarse el libro una sola
+    vez rompe esa garantía.
+  */
+  const unidades = detectado?.cantidad_visible;
+  if (unidades && unidades > 0) {
+    const { error: errorMov } = await supabase.from("movimientos_inventario").insert({
+      producto_id: productoId,
+      tipo: "ingreso",
+      cantidad: unidades,
+      motivo: "Conteo inicial estimado desde las fotos. Revisar.",
+      creado_por: perfilId,
+    });
     if (errorMov) {
       /*
-        Los productos ya existen, así que esto no es motivo para fallar: se
-        registra y quedan en cero, que es visible y corregible desde la ficha.
+        El producto ya existe, así que esto no es motivo para fallar: se
+        registra y queda en cero, que es visible y corregible desde la ficha.
       */
-      console.error("No pude registrar los conteos iniciales:", errorMov.message);
+      console.error("No pude registrar el conteo inicial:", errorMov.message);
     }
   }
 
   revalidatePath("/panel");
-
-  /* Con uno solo, la pantalla de revisión sobra. Con varios, es necesaria. */
-  if (ids.length === 1) redirect(`/panel/productos/${ids[0]}`);
-  redirect(`/panel/nuevo/revision/${analisisId}`);
+  redirect(`/panel/productos/${productoId}`);
 }
 
 /*
@@ -323,6 +368,42 @@ export async function actualizarProducto(_p: EstadoAccion, datos: FormData): Pro
     return { error: "Para confirmar un producto hay que asignarle una categoría." };
   }
 
+  /*
+    Atributos del rubro de anticuario. Todos opcionales: quien vende
+    herramientas no los llena nunca, y exigirlos produciría años y materiales
+    inventados con tal de poder guardar.
+
+    Se validan acá ADEMÁS de en la base. El check de la base es la barrera
+    real; esto existe para devolver "el año va entre 1500 y 2100" en vez de un
+    error de Postgres sobre una restricción cuyo nombre nadie conoce.
+  */
+  const anio = numero(datos, "anio_aproximado");
+  if (anio !== null && (anio < 1500 || anio > 2100)) {
+    return { error: "El año aproximado tiene que estar entre 1500 y 2100." };
+  }
+
+  const medidas = {
+    alto_cm: numero(datos, "alto_cm"),
+    ancho_cm: numero(datos, "ancho_cm"),
+    profundidad_cm: numero(datos, "profundidad_cm"),
+  };
+  if (Object.values(medidas).some((m) => m !== null && m <= 0)) {
+    return { error: "Las medidas, si las cargas, tienen que ser mayores que cero." };
+  }
+
+  const conservacion = texto(datos, "estado_conservacion");
+  if (
+    conservacion &&
+    !["nuevo", "como_nuevo", "buen_estado", "usado", "para_restaurar"].includes(conservacion)
+  ) {
+    return { error: "Ese estado de conservación no existe." };
+  }
+
+  const ubicacionTipo = texto(datos, "ubicacion_tipo");
+  if (ubicacionTipo && !["tienda", "bodega"].includes(ubicacionTipo)) {
+    return { error: "Esa ubicación no existe. Es en tienda o en bodega." };
+  }
+
   const supabase = await crearClienteServidor();
   const { data, error } = await supabase
     .from("productos")
@@ -333,8 +414,14 @@ export async function actualizarProducto(_p: EstadoAccion, datos: FormData): Pro
       unidad: texto(datos, "unidad") || "unidad",
       precio_confirmado_clp: precio,
       ubicacion: opcional(datos, "ubicacion"),
+      ubicacion_tipo: ubicacionTipo || null,
       estado,
       notas: opcional(datos, "notas"),
+      estado_conservacion: conservacion || null,
+      epoca: opcional(datos, "epoca"),
+      anio_aproximado: anio,
+      material: opcional(datos, "material"),
+      ...medidas,
       /*
         Un producto tocado por una persona deja de ser puramente de la IA. Se
         marca mixto para poder distinguir después qué revisó alguien y qué no.

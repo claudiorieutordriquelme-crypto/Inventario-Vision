@@ -44,6 +44,140 @@ const ESTADOS = [
 
 const UNIDADES = ["unidad", "caja", "par", "juego", "metro", "litro", "kilo", "rollo"];
 
+const CONSERVACION = [
+  { valor: "", etiqueta: "Sin indicar" },
+  { valor: "nuevo", etiqueta: "Nuevo — sin uso" },
+  { valor: "como_nuevo", etiqueta: "Como nuevo — usado, sin marcas" },
+  { valor: "buen_estado", etiqueta: "Buen estado — marcas de uso normales" },
+  { valor: "usado", etiqueta: "Usado — desgaste visible, funciona" },
+  { valor: "para_restaurar", etiqueta: "Para restaurar — necesita trabajo" },
+];
+
+/*
+  Atributos de menaje, antigüedades, muñecas y colección.
+
+  VAN PLEGADOS Y NO MEZCLADOS CON EL RESTO. Son siete campos que quien vende
+  herramientas no va a llenar nunca, y siete campos vacíos en medio del
+  formulario hacen que el que sí importa se pierda. Se abren solos cuando el
+  producto ya tiene alguno cargado: si hay un dato adentro, esconderlo sería
+  esconder información que alguien se tomó el trabajo de escribir.
+
+  Ninguno es obligatorio, en pantalla ni en la base. De una pieza se sabe lo
+  que se sabe, y un campo obligatorio acá produce "años 1900" inventados que
+  después nadie distingue de los ciertos.
+*/
+function AtributosRubro({ producto }: { producto: ProductoConCategoria }) {
+  const hayDatos = Boolean(
+    producto.estado_conservacion ||
+      producto.epoca ||
+      producto.anio_aproximado ||
+      producto.material ||
+      producto.alto_cm ||
+      producto.ancho_cm ||
+      producto.profundidad_cm,
+  );
+
+  return (
+    <details open={hayDatos} className="rounded-lg border border-gris-200 p-4">
+      <summary className="cursor-pointer text-sm font-bold tracking-widest text-gris-500 uppercase">
+        Atributos de la pieza
+      </summary>
+
+      <p className="mt-2 max-w-prose text-sm text-gris-600">
+        Para menaje, antigüedades, muñecas y colección. Todos opcionales: deja
+        vacío lo que no sepas en vez de aproximarlo.
+      </p>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-sm font-semibold text-gris-800">Estado de conservación</span>
+          <select
+            name="estado_conservacion"
+            defaultValue={producto.estado_conservacion ?? ""}
+            className={claseCampo}
+          >
+            {CONSERVACION.map((c) => (
+              <option key={c.valor} value={c.valor}>
+                {c.etiqueta}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-semibold text-gris-800">Material</span>
+          <input
+            name="material"
+            defaultValue={producto.material ?? ""}
+            placeholder="Porcelana, roble, bronce"
+            className={claseCampo}
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-semibold text-gris-800">Época</span>
+          <input
+            name="epoca"
+            defaultValue={producto.epoca ?? ""}
+            placeholder="Años 50"
+            className={claseCampo}
+          />
+          <span className="mt-1 block text-xs text-gris-500">
+            Texto libre. De una pieza se sabe la década mucho más seguido que el
+            año exacto.
+          </span>
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-semibold text-gris-800">Año aproximado</span>
+          <input
+            name="anio_aproximado"
+            inputMode="numeric"
+            defaultValue={producto.anio_aproximado ?? ""}
+            placeholder="1954"
+            className={claseCampo}
+          />
+          <span className="mt-1 block text-xs text-gris-500">
+            Solo si lo sabes. Entre 1500 y 2100.
+          </span>
+        </label>
+
+        {/* Las tres medidas en una fila: se toman juntas, con la huincha en la
+            mano, y separarlas obliga a soltar la pieza entre campo y campo. */}
+        <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+          <label className="block">
+            <span className="text-sm font-semibold text-gris-800">Alto (cm)</span>
+            <input
+              name="alto_cm"
+              inputMode="decimal"
+              defaultValue={producto.alto_cm ?? ""}
+              className={claseCampo}
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-semibold text-gris-800">Ancho (cm)</span>
+            <input
+              name="ancho_cm"
+              inputMode="decimal"
+              defaultValue={producto.ancho_cm ?? ""}
+              className={claseCampo}
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-semibold text-gris-800">Fondo (cm)</span>
+            <input
+              name="profundidad_cm"
+              inputMode="decimal"
+              defaultValue={producto.profundidad_cm ?? ""}
+              className={claseCampo}
+            />
+          </label>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 export function EditarProducto({
   producto,
   categorias,
@@ -130,12 +264,32 @@ export function EditarProducto({
             </span>
           </label>
 
+          {/*
+            DOS CAMPOS Y NO UNO. La tipología es lo que se filtra y lo que
+            decide si una venta se puede retirar en tienda o hay que ir a
+            buscarla; el detalle en texto libre es lo que permite encontrarla
+            dentro del lugar. Con un solo campo de texto, "bodega" y "Bodega 2"
+            son dos valores distintos y no se puede filtrar por ninguno.
+          */}
           <label className="block">
-            <span className="text-sm font-semibold text-gris-800">Ubicación</span>
+            <span className="text-sm font-semibold text-gris-800">Dónde está</span>
+            <select
+              name="ubicacion_tipo"
+              defaultValue={producto.ubicacion_tipo ?? ""}
+              className={claseCampo}
+            >
+              <option value="">Sin indicar</option>
+              <option value="tienda">En tienda</option>
+              <option value="bodega">En bodega</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-sm font-semibold text-gris-800">Detalle del lugar</span>
             <input
               name="ubicacion"
               defaultValue={producto.ubicacion ?? ""}
-              placeholder="Bodega 2, estante C"
+              placeholder="Estante C, vitrina del fondo"
               className={claseCampo}
             />
           </label>
@@ -161,6 +315,8 @@ export function EditarProducto({
             />
           </label>
         </div>
+
+        <AtributosRubro producto={producto} />
 
         <p className="text-sm text-gris-500">
           La cantidad no se edita acá: se cambia registrando un movimiento, para

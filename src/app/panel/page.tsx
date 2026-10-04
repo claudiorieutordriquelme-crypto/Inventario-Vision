@@ -3,6 +3,7 @@ import { PERMISOS, perfilHabilitado } from "@/lib/auth";
 import { cargarResumen, listarCategorias, listarProductos } from "@/lib/datos/inventario";
 import { ETIQUETA_ESTADO, formateaNumero, formateaPesos } from "@/lib/formato";
 import type { EstadoProducto } from "@/lib/tipos";
+import { ConsumoApi } from "./consumo-api";
 import { ListaInventario } from "./piezas-listado";
 
 /*
@@ -34,6 +35,7 @@ export default async function InventarioPage({
   /* Borrar productos NO es lo mismo que administrar: el operador borra, pero
      no toca categorías ni usuarios. */
   const puedeBorrar = perfil ? PERMISOS.borrarProductos.includes(perfil.rol) : false;
+  const esAdmin = perfil ? PERMISOS.administrar.includes(perfil.rol) : false;
   const hayFiltros = Object.values(filtros).some(Boolean);
 
   /*
@@ -76,6 +78,10 @@ export default async function InventarioPage({
           ) : null}
         </div>
       </div>
+
+      {/* El consumo de la API lo ve quien carga fotos, porque es quien lo
+          gasta. El lector no: no puede provocar una sola llamada al modelo. */}
+      {puedeOperar ? <ConsumoApi esAdmin={esAdmin} /> : null}
 
       {/* Cuatro cifras, del mismo peso. Un número héroe solo no dice nada:
           la valorización sin el conteo de borradores esconde cuánto de esa

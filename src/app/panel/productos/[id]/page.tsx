@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PERMISOS, perfilHabilitado } from "@/lib/auth";
 import { listarCategorias, obtenerProducto } from "@/lib/datos/inventario";
+import { listarImagenes } from "@/lib/datos/imagenes";
+import { hayAnalisisDisponible } from "@/lib/env";
 import { crearClienteServidor } from "@/lib/supabase/servidor";
+import type { ReferenciaProducto } from "@/lib/tipos";
+import { Galeria } from "./galeria";
+import { Referencias } from "./referencias";
 import {
   ETIQUETA_MOVIMIENTO,
   PRESENTACION_ESTADO,
@@ -30,23 +35,30 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
   const puedeBorrar = perfil ? PERMISOS.borrarProductos.includes(perfil.rol) : false;
 
   /*
-    La foto vive en un bucket privado. Se firma una URL de vida corta en el
-    servidor y se pasa ya resuelta: así no hace falta JavaScript de cliente
-    para verla, y la URL deja de servir en cinco minutos. Un bucket público
-    habría sido más simple y habría dejado las fotos del inventario en una
-    dirección adivinable.
+    Las imágenes viven en un bucket privado. Se firman URL de vida corta en el
+    servidor y se pasan ya resueltas: así no hace falta JavaScript de cliente
+    para verlas, y dejan de servir en cinco minutos. Un bucket público habría
+    sido más simple y habría dejado las fotos del inventario en una dirección
+    adivinable.
   */
-  let urlFoto: string | null = null;
-  if (producto.foto_path) {
-    const supabase = await crearClienteServidor();
-    const { data, error: errorFirma } = await supabase.storage
-      .from(producto.foto_bucket ?? "fotos")
-      .createSignedUrl(producto.foto_path, 300);
-    if (errorFirma) {
-      console.error("No pude firmar la URL de la foto:", errorFirma.message);
-    }
-    urlFoto = data?.signedUrl ?? null;
+  const { imagenes, error: errorImagenes } = await listarImagenes(producto.id);
+
+  /*
+    Las referencias aceptadas. Van en su propia consulta y no en obtenerProducto
+    porque solo las necesita esta pantalla: el listado del inventario no las
+    muestra, y traerlas ahí sería cargarlas quinientas veces para nada.
+  */
+  const supabaseRef = await crearClienteServidor();
+  const { data: refs, error: errorRefs } = await supabaseRef
+    .from("producto_referencias")
+    .select("id, producto_id, url, titulo, extracto, dominio, respalda, precio_mencionado_clp, created_at")
+    .eq("producto_id", producto.id)
+    .order("created_at", { ascending: false });
+
+  if (errorRefs) {
+    console.error("No pude leer las referencias:", errorRefs.message);
   }
+  const referencias = (refs ?? []) as ReferenciaProducto[];
 
   const pres = PRESENTACION_ESTADO[producto.estado];
   const precio = procedenciaPrecio(producto.precio_confirmado_clp, producto.precio_estimado_clp);
@@ -77,26 +89,22 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
         <p className="mt-2 max-w-prose text-sm text-gris-600">{pres.explica}</p>
       </div>
 
-      <section className="grid grid-cols-1 gap-6 sm:grid-cols-[minmax(0,18rem)_1fr]">
-        {urlFoto ? (
-          <figure className="rounded-lg border border-gris-200 p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element -- URL firmada y efímera: el optimizador de Next la cachearía más allá de su vida útil */}
-            <img
-              src={urlFoto}
-              alt={`Foto de ${producto.nombre}`}
-              className="mx-auto max-h-64 w-auto rounded"
-            />
-            <figcaption className="mt-2 text-center text-xs text-gris-500">
-              La foto con la que se cargó
-            </figcaption>
-          </figure>
-        ) : (
-          <div className="flex items-center justify-center rounded-lg border border-gris-200 p-6 text-sm text-gris-500">
-            {producto.foto_path ? "No pude cargar la foto." : "Sin foto."}
-          </div>
-        )}
+      {/*
+        La galería va a lo ancho y antes de las cifras. Las imágenes son lo
+        primero que se mira de una pieza usada, y además son lo que decide si
+        el producto se puede confirmar: meterlas en una columna lateral dejaba
+        el aviso de "incompleto" fuera de la vista.
+      */}
+      <Galeria
+        productoId={producto.id}
+        nombre={producto.nombre}
+        imagenes={imagenes}
+        puedeOperar={puedeOperar}
+        errorLectura={errorImagenes}
+      />
 
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-2">
+      <section>
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg border border-gris-200 p-4">
             <dt className="text-xs font-semibold tracking-wide text-gris-500 uppercase">
               Cantidad
@@ -168,6 +176,15 @@ export default async function ProductoPage({ params }: { params: Promise<{ id: s
           Datos del producto
         </h2>
         <EditarProducto producto={producto} categorias={categorias} puedeOperar={puedeOperar} />
+      </section>
+
+      <section className="border-t border-gris-200 pt-6">
+        <Referencias
+          productoId={producto.id}
+          guardadas={referencias}
+          puedeOperar={puedeOperar}
+          busquedaDisponible={hayAnalisisDisponible()}
+        />
       </section>
 
       <section className="space-y-3 border-t border-gris-200 pt-6">

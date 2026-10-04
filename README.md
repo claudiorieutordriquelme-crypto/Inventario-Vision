@@ -92,11 +92,60 @@ ANTHROPIC_API_KEY=<clave>            # opcional, ver abajo
 ```
 
 `ANTHROPIC_API_KEY` es opcional a propósito. Sin ella todo el inventario
-funciona: se cargan productos, se editan, se registran movimientos. Lo único
-que deja de andar es el análisis automático de fotos, y la pantalla lo dice en
-vez de fallar.
+funciona: se cargan productos, se editan, se registran movimientos, se vende y
+se despacha. Lo único que deja de andar es el análisis automático de fotos y la
+búsqueda de referencias en la web, y las dos pantallas lo dicen en vez de
+fallar.
 
-### 5. Local
+Ninguna variable lleva prefijo `NEXT_PUBLIC_`, y es una decisión: con él, el
+valor termina dentro del paquete que descarga el navegador.
+
+**Cosas que NO son variables de entorno, y dónde viven:**
+
+| Qué | Dónde se configura | Por qué no es una variable |
+|---|---|---|
+| Tope mensual de gasto de la API | Tabla `presupuesto_api`, se edita en `/panel` | Cambiarlo no debería exigir un despliegue |
+| Credenciales de la cuenta demo | Tabla `acceso_demo` | Se apaga con un `UPDATE`, sin desplegar |
+| Dirección pública del sitio | Se deduce de las cabeceras de cada petición | Una variable mal puesta rompería los QR en silencio |
+
+### 5. Quién puede hacer qué
+
+Los permisos los hace cumplir la base con políticas RLS. La interfaz esconde
+botones por comodidad; la barrera real son las políticas.
+
+| Acción | Admin | Operador | Lector |
+|---|---|---|---|
+| Ver inventario, ventas, despachos y clientes | Sí | Sí | Sí |
+| Cargar productos con foto, editarlos, mover stock | Sí | Sí | No |
+| Agregar y quitar imágenes de un producto | Sí | Sí | No |
+| Buscar referencias en la web y guardarlas | Sí | Sí | No |
+| Vender: abrir carrito, cobrar, anular | Sí | Sí | No |
+| Despachar: armar cajas, embalar, avanzar estado | Sí | Sí | No |
+| Crear y editar clientes y sus direcciones | Sí | Sí | No |
+| Borrar productos | Sí | Sí | No |
+| Borrar clientes | Sí | No | No |
+| Categorías, usuarios y presupuesto | Sí | No | No |
+
+Dos cosas que **nadie** puede hacer, ni el administrador:
+
+- Editar o borrar un movimiento del libro de inventario. Una corrección se hace
+  con un ajuste que compensa, y ese ajuste queda registrado.
+- Cambiar los productos de una venta ya confirmada. Se anula y se hace otra.
+
+### 6. Comprobar que todo quedó bien
+
+```bash
+# El esquema: RLS, permisos de anon, triggers blindados, SKU sin carreras
+SUPABASE_PROJECT_REF=<ref> node scripts/verifica-esquema.mjs
+
+# Las reglas del negocio: 3 imágenes, pieza única, stock, cajas, QR
+SUPABASE_PROJECT_REF=<ref> node scripts/verifica-reglas.mjs
+```
+
+El segundo le pide a la base que haga lo prohibido y comprueba que se niegue.
+Corre dentro de una transacción que vuelve atrás: no deja nada escrito.
+
+### 7. Local
 
 ```bash
 npm install
