@@ -12,7 +12,14 @@ import {
   formateaMomento,
 } from "@/lib/formato";
 import type { DireccionCliente } from "@/lib/tipos";
-import { Anular, Carrito, Cobrar, DatosVenta, Resultados } from "./piezas";
+import {
+  Anular,
+  BuscarFotoEnVenta,
+  Carrito,
+  Cobrar,
+  DatosVenta,
+  Resultados,
+} from "./piezas";
 
 export const dynamic = "force-dynamic";
 
@@ -120,6 +127,12 @@ export default async function VentaPage({
           <h2 className="text-sm font-bold tracking-widest text-gris-500 uppercase">
             Buscar productos
           </h2>
+
+          {/* La foto va primero: con la pieza en la mano y el cliente
+              esperando, es el camino que no exige acordarse del nombre. */}
+          <div className="mt-3">
+            <BuscarFotoEnVenta ventaId={venta.id} />
+          </div>
           <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
             <label className="min-w-0 flex-1">
               <span className="text-sm font-semibold text-gris-800">Nombre o SKU</span>

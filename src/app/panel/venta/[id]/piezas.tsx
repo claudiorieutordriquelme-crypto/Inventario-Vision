@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import {
   actualizarVenta,
   agregarAlCarrito,
@@ -19,6 +19,7 @@ import type {
   VentaItem,
 } from "@/lib/tipos";
 import type { ResultadoBusqueda } from "@/lib/datos/comercial";
+import { BuscarPorFoto } from "../../buscar-foto";
 
 const claseCampo =
   "mt-1.5 w-full rounded-md border border-gris-300 px-3 py-2.5 text-base text-gris-900 outline-none focus:border-primario focus:ring-2 focus:ring-primario/30";
@@ -133,6 +134,54 @@ export function Resultados({
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/*
+  Buscar en el punto de venta sacándole una foto a la pieza.
+
+  POR QUÉ ACÁ IMPORTA MÁS QUE EN EL INVENTARIO. Quien vende tiene la pieza en
+  la mano y al cliente esperando: si no se acuerda de cómo se llama ni de su
+  SKU, escribir en el buscador es adivinar. La foto es el único camino que no
+  depende de recordar nada.
+
+  El resultado se agrega al carrito con un envío normal del formulario, el
+  mismo que usan los resultados de texto: así la validación de stock, de precio
+  y de pieza única es exactamente la misma por los dos caminos.
+*/
+export function BuscarFotoEnVenta({ ventaId }: { ventaId: string }) {
+  const [estado, accion, pendiente] = useActionState<EstadoVentaAccion, FormData>(
+    agregarAlCarrito,
+    {},
+  );
+  const envio = useRef<HTMLFormElement>(null);
+  const campoProducto = useRef<HTMLInputElement>(null);
+
+  return (
+    <div>
+      <form ref={envio} action={accion} className="hidden">
+        <input type="hidden" name="venta_id" value={ventaId} />
+        <input ref={campoProducto} type="hidden" name="producto_id" />
+        <input type="hidden" name="cantidad" value="1" />
+      </form>
+
+      <BuscarPorFoto
+        etiquetaAccion="Agregar"
+        alElegir={(productoId) => {
+          if (campoProducto.current) {
+            campoProducto.current.value = productoId;
+            envio.current?.requestSubmit();
+          }
+        }}
+      />
+
+      {pendiente ? (
+        <p aria-live="polite" className="mt-2 text-sm text-gris-600">
+          Agregando al carrito...
+        </p>
+      ) : null}
+      <Mensaje estado={estado} />
     </div>
   );
 }

@@ -530,98 +530,143 @@ export function ListaInventario({
         </label>
       ) : null}
 
-      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      {/*
+        ── POR QUÉ FILAS COMPACTAS EN UNA COLUMNA Y NO TARJETAS EN DOS ──────
+
+        Antes eran tarjetas grandes en dos columnas. Con treinta productos se
+        veía bien; con mil es imposible encontrar nada, por dos razones
+        concretas:
+
+        1. En dos columnas la vista zigzaguea. Para comparar el stock de la
+           fila 4 con el de la 9 hay que buscar dónde quedó cada dato, porque
+           no están a la misma altura ni en la misma posición horizontal. En
+           una columna con campos alineados, el ojo baja en línea recta.
+        2. Cada tarjeta ocupaba casi el alto de un teléfono. Diez productos ya
+           exigían desplazar tres pantallas.
+
+        Acá cada fila tiene la misma altura y cada dato vive siempre en la
+        misma columna: nombre a la izquierda, cantidad, precio y estado
+        alineados a la derecha. Eso es lo que permite recorrer cincuenta filas
+        de un vistazo y detectar la que está en cero.
+
+        LA MINIATURA NO ES DECORACIÓN. En un inventario de piezas usadas,
+        "Taza de porcelana" describe a veinte productos distintos; la foto los
+        separa de inmediato. Va con loading lazy a propósito: cada una firma
+        una URL en el servidor, y sin lazy serían cincuenta firmas por página
+        aunque se miren cinco.
+      */}
+      <ul className="divide-y divide-gris-100 rounded-lg border border-gris-200">
         {productos.map((p) => {
           const pres = PRESENTACION_ESTADO[p.estado];
           const precio = procedenciaPrecio(p.precio_confirmado_clp, p.precio_estimado_clp);
           const marcado = marcados.includes(p.id);
+          const sinStock = Number(p.cantidad) <= 0;
 
           return (
             <li
               key={p.id}
-              className={`flex overflow-hidden rounded-lg border ${
-                marcado ? "border-primario" : "border-gris-200"
+              className={`flex items-center gap-3 p-3 transition-colors ${
+                marcado ? "bg-primario/5" : "hover:bg-gris-50"
               }`}
             >
-              <div className={`w-2 shrink-0 ${pres.barra}`} aria-hidden="true" />
-              <div className="min-w-0 flex-1 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-                  <div className="flex min-w-0 gap-3">
-                    {puedeSeleccionar ? (
-                      <input
-                        type="checkbox"
-                        checked={marcado}
-                        onChange={() => alterna(p.id)}
-                        aria-label={`Seleccionar ${p.sku}, ${p.nombre}`}
-                        className="mt-1 size-4 shrink-0 accent-primario"
-                      />
-                    ) : null}
+              {puedeSeleccionar ? (
+                <input
+                  type="checkbox"
+                  checked={marcado}
+                  onChange={() => alterna(p.id)}
+                  aria-label={`Seleccionar ${p.sku}, ${p.nombre}`}
+                  className="size-4 shrink-0 accent-primario"
+                />
+              ) : null}
 
-                    <div className="min-w-0">
-                      <p className="text-xs font-semibold tracking-wide text-gris-500 uppercase">
-                        {p.categoria_nombre ?? "Sin categoría"}
-                      </p>
-                      <h2 className="text-lg font-bold text-gris-900">{p.nombre}</h2>
-                      <p className="mt-0.5 font-mono text-sm font-semibold text-gris-700">
-                        {p.sku}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-2">
-                    {/* El ojo abre la ficha resumida sin salir del listado: al
-                        revisar veinte borradores, entrar y volver veinte veces
-                        pierde la posición de la lista cada vez. */}
-                    <button
-                      type="button"
-                      onClick={() => setViendo(p)}
-                      aria-label={`Previsualizar ${p.nombre}`}
-                      title="Previsualizar"
-                      className="rounded-md border border-gris-300 p-2 text-gris-700 transition-colors hover:border-primario hover:text-primario"
-                    >
-                      <svg viewBox="0 0 24 24" className="size-5 fill-current" aria-hidden="true">
-                        <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" />
-                      </svg>
-                    </button>
-
-                    {/* La insignia lleva la palabra, no solo el color. */}
-                    <span
-                      className={`rounded px-2 py-1 text-xs font-bold tracking-wide uppercase ${pres.insignia}`}
-                    >
-                      {pres.etiqueta}
-                    </span>
-                  </div>
-                </div>
-
-                <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gris-600">
-                  <div className="flex gap-1">
-                    <dt className="font-semibold">Cantidad:</dt>
-                    <dd>
-                      {formateaNumero(p.cantidad)} {p.unidad}
-                    </dd>
-                  </div>
-                  <div className="flex gap-1">
-                    <dt className="font-semibold">Precio:</dt>
-                    <dd>{precio.valor}</dd>
-                  </div>
-                  {p.ubicacion ? (
-                    <div className="flex gap-1">
-                      <dt className="font-semibold">Ubicación:</dt>
-                      <dd>{p.ubicacion}</dd>
-                    </div>
-                  ) : null}
-                </dl>
-
-                {precio.revisar ? (
-                  <p className="mt-2 text-xs text-gris-500">{precio.origen}</p>
-                ) : null}
-
-                <AccionesFila
-                  producto={p}
-                  puedeOperar={puedeOperar}
-                  puedeBorrar={puedeBorrar}
+              {/* La barra de estado se mantiene, pero como un filo delgado
+                  pegado a la miniatura en vez de un bloque de dos píxeles de
+                  ancho por toda la tarjeta. */}
+              <div className="relative shrink-0">
+                {/* eslint-disable-next-line @next/next/no-img-element -- ruta propia que redirige a una URL firmada y efímera */}
+                <img
+                  src={`/panel/foto/${p.id}`}
+                  alt=""
+                  loading="lazy"
+                  className="size-12 rounded border border-gris-200 bg-gris-50 object-cover"
+                />
+                <span
+                  className={`absolute inset-y-0 -left-0.5 w-1 rounded-full ${pres.barra}`}
+                  aria-hidden="true"
                 />
               </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-gris-900">{p.nombre}</p>
+                <p className="mt-0.5 truncate text-xs text-gris-600">
+                  <span className="font-mono font-semibold">{p.sku}</span>
+                  {" · "}
+                  {p.categoria_nombre ?? "Sin categoría"}
+                  {p.ubicacion ? ` · ${p.ubicacion}` : ""}
+                </p>
+              </div>
+
+              {/* Ancho fijo para que la columna se alinee entre filas. Sin él,
+                  un nombre largo corre el precio y se pierde la alineación que
+                  hace comparable la lista. */}
+              <div className="hidden w-24 shrink-0 text-right sm:block">
+                <p
+                  className={`text-sm font-bold ${sinStock ? "text-acento" : "text-gris-900"}`}
+                >
+                  {formateaNumero(p.cantidad)}
+                </p>
+                <p className="text-xs text-gris-500">{sinStock ? "sin stock" : p.unidad}</p>
+              </div>
+
+              <div className="hidden w-28 shrink-0 text-right sm:block">
+                <p className="text-sm font-bold text-gris-900">{precio.valor}</p>
+                {/* El origen del precio solo se muestra cuando hay que
+                    revisarlo. En las filas ya confirmadas sería ruido repetido
+                    cincuenta veces. */}
+                {precio.revisar ? (
+                  <p className="text-xs text-gris-500">sin revisar</p>
+                ) : null}
+              </div>
+
+              <span
+                className={`hidden shrink-0 rounded px-2 py-1 text-xs font-bold tracking-wide uppercase sm:inline ${pres.insignia}`}
+              >
+                {pres.etiqueta}
+              </span>
+
+              {/* El ojo abre la ficha resumida sin salir del listado: al
+                  revisar veinte borradores, entrar y volver veinte veces
+                  pierde la posición de la lista cada vez. */}
+              <button
+                type="button"
+                onClick={() => setViendo(p)}
+                aria-label={`Previsualizar ${p.nombre}`}
+                title="Previsualizar"
+                className="shrink-0 rounded-md border border-gris-300 p-2 text-gris-700 transition-colors hover:border-primario hover:text-primario"
+              >
+                <svg viewBox="0 0 24 24" className="size-4 fill-current" aria-hidden="true">
+                  <path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 2.5a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9zm0 2a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z" />
+                </svg>
+              </button>
+
+              {/*
+                Las acciones de la fila van dentro de un <details>: con
+                cincuenta filas, cincuenta juegos de botones compiten entre sí
+                y con el contenido. Plegadas, la lista se lee; desplegadas,
+                están donde siempre estuvieron.
+              */}
+              <details className="shrink-0">
+                <summary className="cursor-pointer rounded-md border border-gris-300 px-2 py-2 text-xs font-semibold text-gris-700 transition-colors hover:border-primario hover:text-primario">
+                  Acciones
+                </summary>
+                <div className="absolute right-4 z-10 mt-1 rounded-lg border border-gris-200 bg-blanco p-3 shadow-tarjeta">
+                  <AccionesFila
+                    producto={p}
+                    puedeOperar={puedeOperar}
+                    puedeBorrar={puedeBorrar}
+                  />
+                </div>
+              </details>
             </li>
           );
         })}

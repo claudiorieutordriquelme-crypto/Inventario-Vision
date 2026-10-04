@@ -45,16 +45,56 @@ export type FiltrosInventario = {
   buscar?: string;
   categoria?: string;
   estado?: string;
+  ubicacion?: string;
+  /** 1-based. Lo que viene en la dirección. */
+  pagina?: number;
+  orden?: OrdenInventario;
 };
 
 /*
-  Listado del inventario.
+  Cómo se puede ordenar el listado.
 
-  Límite conocido: 500 productos por página de resultados, y se declara en
-  pantalla cuando se alcanza. Un corte silencioso hace que alguien concluya que
-  un producto no existe cuando solo quedó fuera del lote.
+  RECIENTES PRIMERO ES EL DEFECTO, y no es arbitrario: lo que alguien acaba de
+  cargar es lo que más probablemente viene a buscar. El resto existe para
+  tareas concretas: por stock para encontrar lo que se está agotando, por
+  precio para revisar lo caro, alfabético para recorrer el catálogo completo
+  sin perder el lugar.
 */
-const LIMITE_LISTADO = 500;
+export type OrdenInventario = "recientes" | "antiguos" | "nombre" | "stock" | "precio";
+
+const ORDENES: Record<OrdenInventario, { columna: string; asc: boolean }> = {
+  recientes: { columna: "created_at", asc: false },
+  antiguos: { columna: "created_at", asc: true },
+  nombre: { columna: "nombre", asc: true },
+  stock: { columna: "cantidad", asc: true },
+  precio: { columna: "precio_vigente_clp", asc: false },
+};
+
+export const ETIQUETA_ORDEN: Record<OrdenInventario, string> = {
+  recientes: "Más recientes",
+  antiguos: "Más antiguos",
+  nombre: "Nombre (A-Z)",
+  stock: "Menos stock primero",
+  precio: "Precio, de mayor a menor",
+};
+
+/*
+  Cuántos productos por página.
+
+  CINCUENTA, Y ES UNA DECISIÓN DE VOLUMEN. Antes se traían quinientos y se
+  pintaban todos: con un inventario grande eso significa medio megabyte de
+  HTML, un navegador que se arrastra al hacer scroll, y una persona que no
+  encuentra nada porque tiene quinientas filas delante. Cincuenta es lo que se
+  recorre con la vista sin perder el hilo, y la paginación deja claro cuántos
+  hay en total en vez de esconderlo.
+
+  POR QUÉ PÁGINAS Y NO SCROLL INFINITO. Con scroll infinito no se puede volver
+  a donde uno estaba, el botón atrás pierde la posición, y nunca se sabe
+  cuánto falta. Para buscar algo concreto —que es para lo que se usa esta
+  pantalla— las páginas ganan; el scroll infinito sirve para navegar sin
+  destino, que no es el caso.
+*/
+export const POR_PAGINA = 50;
 
 /*
   La exportación usa un tope mucho más alto que la pantalla. Una tabla de
@@ -67,46 +107,106 @@ export const LIMITE_EXPORTACION = 5000;
 
 export async function listarProductos(
   filtros: FiltrosInventario = {},
-  limite: number = LIMITE_LISTADO,
+  limite: number = POR_PAGINA,
 ): Promise<{
   productos: ProductoListado[];
   ubicaciones: string[];
   truncado: boolean;
+  /** Cuántos hay con estos filtros, no cuántos vinieron en esta página. */
+  total: number;
+  pagina: number;
+  paginas: number;
   error: string | null;
 }> {
   const supabase = await crearClienteServidor();
+
+  const pagina = Math.max(1, Math.floor(filtros.pagina ?? 1));
+  const desde = (pagina - 1) * limite;
+  const orden = ORDENES[filtros.orden ?? "recientes"] ?? ORDENES.recientes;
+
+  /*
+    LA BÚSQUEDA POR TEXTO VA POR TRIGRAMAS, no por ilike.
+
+    El ilike anterior exigía escribir el nombre tal cual: quien buscaba "muñeca
+    porcelna" no encontraba "Muñeca de porcelana", y con acentos tampoco. La
+    función buscar_productos() tolera letras cambiadas, faltantes y sobrantes,
+    y además ordena por parecido.
+
+    Se resuelve primero a una lista de ids y después se traen esos productos:
+    es lo que permite seguir usando los mismos filtros, el mismo orden y la
+    misma paginación para los dos caminos.
+  */
+  let idsPorTexto: string[] | null = null;
+  const termino = (filtros.buscar ?? "").trim();
+  if (termino) {
+    const { data: encontrados, error: errorBusqueda } = await supabase.rpc("buscar_productos", {
+      p_texto: termino,
+      p_limite: 200,
+    });
+
+    if (errorBusqueda) {
+      console.error("No pude buscar productos:", errorBusqueda.message);
+      return {
+        productos: [],
+        ubicaciones: [],
+        truncado: false,
+        total: 0,
+        pagina,
+        paginas: 0,
+        error: errorBusqueda.message,
+      };
+    }
+
+    idsPorTexto = ((encontrados ?? []) as { id: string }[]).map((e) => e.id);
+
+    /* Sin coincidencias no hace falta ir a buscar nada más. */
+    if (idsPorTexto.length === 0) {
+      return {
+        productos: [],
+        ubicaciones: [],
+        truncado: false,
+        total: 0,
+        pagina: 1,
+        paginas: 0,
+        error: null,
+      };
+    }
+  }
 
   let consulta = supabase
     .from("productos")
     /*
       El conteo de movimientos viene embebido y agregado por la base, no
-      trayendo las filas para contarlas acá. Con quinientos productos que
-      pueden tener decenas de movimientos cada uno, traerlas sería mover miles
-      de filas para calcular un número por producto.
-    */
-    .select("*, categorias(nombre, codigo), movimientos_inventario(count)")
-    .order("created_at", { ascending: false })
-    .limit(limite);
+      trayendo las filas para contarlas acá. Con productos que pueden tener
+      decenas de movimientos cada uno, traerlas sería mover miles de filas para
+      calcular un número por producto.
 
+      count exact: es lo que permite decir "mostrando 51 a 100 de 1.240". Sin
+      el total, la paginación no puede decir cuántas páginas hay y la persona
+      navega a ciegas.
+    */
+    .select("*, categorias(nombre, codigo), movimientos_inventario(count)", { count: "exact" })
+    .order(orden.columna, { ascending: orden.asc, nullsFirst: false })
+    .range(desde, desde + limite - 1);
+
+  if (idsPorTexto) consulta = consulta.in("id", idsPorTexto);
   if (filtros.categoria) consulta = consulta.eq("categoria_id", filtros.categoria);
   if (filtros.estado) consulta = consulta.eq("estado", filtros.estado);
-  /*
-    La búsqueda va contra nombre y SKU, sin distinguir mayúsculas. El comodín
-    se arma acá y no se acepta del usuario: un % suelto en el texto convertiría
-    cualquier búsqueda en "traer todo".
-  */
-  if (filtros.buscar) {
-    const termino = filtros.buscar.replace(/[%_]/g, "").trim();
-    if (termino) {
-      consulta = consulta.or(`nombre.ilike.%${termino}%,sku.ilike.%${termino}%`);
-    }
-  }
+  if (filtros.ubicacion) consulta = consulta.eq("ubicacion_tipo", filtros.ubicacion);
 
-  const { data, error } = await consulta;
+  const { data, error, count } = await consulta;
 
   if (error) {
     console.error("No pude leer el inventario:", error.message);
-    return { productos: [], ubicaciones: [], truncado: false, error: error.message };
+    return {
+      productos: [],
+      ubicaciones: [],
+      truncado: false,
+      total: 0,
+      pagina,
+      paginas: 0,
+      error: error.message,
+    };
   }
 
   /*
@@ -137,10 +237,20 @@ export async function listarProductos(
     ...new Set(productos.map((p) => p.ubicacion).filter((u): u is string => Boolean(u))),
   ].sort();
 
+  const total = count ?? productos.length;
+
   return {
     productos,
     ubicaciones,
-    truncado: productos.length === limite,
+    /*
+      truncado ya no significa "se cortó el listado": con paginación no se
+      corta nada. Queda reservado para el único corte que sí existe, el de la
+      búsqueda por texto, que trae como mucho 200 coincidencias.
+    */
+    truncado: Boolean(idsPorTexto && idsPorTexto.length >= 200),
+    total,
+    pagina,
+    paginas: Math.max(1, Math.ceil(total / limite)),
     error: null,
   };
 }
