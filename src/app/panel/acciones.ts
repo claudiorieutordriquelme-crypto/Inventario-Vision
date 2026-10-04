@@ -8,6 +8,7 @@ import {
   analizaImagen,
   esMimeSoportado,
   MAXIMO_IMAGENES,
+  type Hoja,
   type MimeImagen,
 } from "@/lib/vision";
 
@@ -180,9 +181,20 @@ export async function analizarYCrear(_p: EstadoAccion, datos: FormData): Promise
     .eq("activo", true)
     .order("orden");
 
+  /*
+    La hoja de referencia, si quien cargó dijo que la pieza está apoyada sobre
+    una. Sin ella el modelo devuelve las medidas en null, que es lo correcto:
+    sin una referencia de tamaño conocido, estimar centímetros desde una foto
+    es inventar.
+  */
+  const hojaPedida = texto(datos, "hoja");
+  const hoja: Hoja | undefined =
+    hojaPedida === "carta" || hojaPedida === "a4" ? hojaPedida : undefined;
+
   const resultado = await analizaImagen(
     subidas.map((s) => ({ datos: s.bytes, mime: s.mime })),
     (categorias ?? []) as { codigo: string; nombre: string; descripcion: string | null }[],
+    hoja,
   );
 
   const detectado = resultado.ok ? resultado.analisis.producto : null;
@@ -261,6 +273,10 @@ export async function analizarYCrear(_p: EstadoAccion, datos: FormData): Promise
       estado_conservacion: detectado?.estado_conservacion ?? null,
       material: detectado?.material ?? null,
       epoca: detectado?.epoca ?? null,
+      /* Las medidas solo entran si hubo hoja Y el modelo pudo compararla. Sin
+         las dos cosas quedan vacías y las llena una persona con la huincha. */
+      ancho_cm: hoja ? (detectado?.ancho_cm ?? null) : null,
+      alto_cm: hoja ? (detectado?.alto_cm ?? null) : null,
       analisis_id: analisisId,
       indice_en_foto: 1,
       creado_por: perfilId,

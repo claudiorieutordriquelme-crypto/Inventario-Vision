@@ -6,35 +6,38 @@ import { z } from "zod";
 import { claveAnthropic } from "@/lib/env";
 
 /*
-  Análisis de una foto de inventario con Claude.
+  Análisis de las fotos de una pieza con Claude.
 
-  UNA FOTO PUEDE TENER VARIOS PRODUCTOS DISTINTOS, y devolver todos es el punto
-  de la herramienta: se llega a la bodega, se apoyan seis cosas en la mesa, una
-  foto, seis productos cargados. Por eso la respuesta es una lista y no un
-  objeto, aunque la mayoría de las veces tenga un solo elemento.
+  UNA PIEZA POR ANÁLISIS, LA DEL CENTRO. Las fotos que llegan son de la MISMA
+  pieza desde distintos ángulos, y el modelo cataloga solo la que está al
+  centro del encuadre: el fondo de una bodega llena se ignora. Por eso la
+  respuesta es un objeto y no una lista.
 
-  LA DISTINCIÓN QUE MÁS IMPORTA, y que el prompt de abajo desarrolla: varios
-  productos DISTINTOS son varias entradas de la lista; varias unidades del
-  MISMO producto son una sola entrada con cantidad. Confundirlas rompe el
-  inventario en las dos direcciones: doce entradas de un mismo tornillo, o un
-  martillo y un alicate sumados como "2 unidades" de algo que no existe.
+  Esto cambió en octubre de 2026 y vale saber qué había antes, porque el
+  comentario anterior sobrevivió un tiempo describiendo lo contrario: el
+  análisis devolvía hasta doce productos por foto, pensado para apoyar seis
+  cosas en una mesa y cargarlas de una vez. Se cambió porque vender una pieza
+  usada exige tres fotos de ESA pieza, y con el criterio viejo esas tres fotos
+  producían tres productos distintos del mismo objeto.
 
   QUÉ HACE Y QUÉ NO HACE, porque la diferencia decide cómo se etiqueta el
   resultado en pantalla:
 
-  IDENTIFICA cada producto, lo clasifica en una de las categorías que existen
-  en la base, escribe una descripción breve y ESTIMA un precio.
+  IDENTIFICA la pieza, la clasifica en una de las categorías que existen en la
+  base, escribe una descripción y ESTIMA un precio.
 
   NO CONSULTA LA WEB. El precio sale del conocimiento del modelo, que tiene
   fecha de corte, no de una búsqueda en retail chileno hoy. Es un punto de
   partida para que una persona lo corrija, no un dato de mercado. Toda la
   aplicación lo trata así: la columna se llama precio_estimado_clp, nunca
-  sobrescribe lo que fija un humano, y la pantalla dice de dónde vino.
+  sobrescribe lo que fija un humano, y la pantalla dice de dónde vino. La
+  búsqueda con fuentes reales vive aparte, en lib/referencias.
 
-  Si algún día se quiere el precio real de mercado, el cambio es acotado:
-  agregar la herramienta de servidor web_search a esta llamada y guardar las
-  fuentes citadas junto al monto. Queda anotado acá para que no haya que
-  reconstruir el razonamiento.
+  NO MIDE SIN REFERENCIA. Las medidas en centímetros solo se piden cuando la
+  pieza está apoyada sobre una hoja de tamaño conocido, y si no hay hoja
+  vuelven en null. Una foto es una proyección: una pieza chica cerca y una
+  grande lejos producen la misma imagen, y sin algo de medida conocida en el
+  encuadre no hay cálculo que recupere la escala.
 */
 
 export const MODELO = "claude-opus-5";
@@ -44,7 +47,7 @@ export const MODELO = "claude-opus-5";
   esta constante sube, y así se puede saber qué resultados vinieron de qué
   instrucciones. Sin esto, comparar la calidad entre dos épocas es imposible.
 */
-export const VERSION_PROMPT = "2026-10-03.1-pieza-central";
+export const VERSION_PROMPT = "2026-10-04.1-pieza-central-con-medidas";
 
 /* Tarifa de claude-opus-5 por millón de tokens, para estimar el costo. */
 const USD_POR_MTOK_ENTRADA = 5;
@@ -124,6 +127,24 @@ const EsquemaProducto = z.object({
     .describe(
       "Época aproximada en palabras, si el estilo la delata: 'años 50', 'mediados del siglo XX'. null si no tienes base.",
     ),
+  /*
+    Medidas. SOLO SE PIDEN CUANDO HAY UNA HOJA DE REFERENCIA en la foto, y el
+    prompt lo deja claro: sin una referencia de tamaño conocido, estimar
+    centímetros desde una foto es inventar. Una pieza chica cerca y una grande
+    lejos producen la misma imagen.
+  */
+  ancho_cm: z
+    .number()
+    .nullable()
+    .describe(
+      "Ancho de la pieza en centímetros, medido comparando contra la hoja de referencia. null si no hay hoja visible o no puedes compararla con confianza.",
+    ),
+  alto_cm: z
+    .number()
+    .nullable()
+    .describe(
+      "Alto o largo de la pieza en centímetros, medido contra la hoja de referencia. Si la foto es desde arriba, esto es el largo sobre la mesa, no la altura de la pieza parada. null si no hay hoja.",
+    ),
   precio_estimado_clp: z
     .number()
     .nullable()
@@ -160,7 +181,28 @@ export type Analisis = z.infer<typeof EsquemaAnalisis>;
 
 export type CategoriaOfrecida = { codigo: string; nombre: string; descripcion: string | null };
 
-function instrucciones(categorias: CategoriaOfrecida[]): string {
+/*
+  Hojas que sirven como referencia de tamaño.
+
+  LAS MEDIDAS SON ESTÁNDARES, no aproximaciones: carta es 215,9 × 279,4 mm
+  (8,5 × 11 pulgadas) y A4 es 210 × 297 mm (ISO 216). Esa exactitud es lo que
+  las vuelve útiles como regla.
+
+  POR QUÉ UNA HOJA Y NO UNA MONEDA O UNA TARJETA. Dos razones medibles:
+  cuanto mayor es la referencia respecto del objeto, menor el error relativo —
+  una tarjeta de 8 cm al lado de un mueble no sirve de nada —, y una hoja tiene
+  cuatro esquinas, así que su forma en la foto delata la inclinación de la
+  cámara. Una tarjeta de lado solo permite suponer que se disparó
+  perpendicular, y cuando no fue así nadie se entera.
+*/
+export const HOJAS = {
+  carta: { nombre: "carta", ancho_cm: 21.59, alto_cm: 27.94 },
+  a4: { nombre: "A4", ancho_cm: 21.0, alto_cm: 29.7 },
+} as const;
+
+export type Hoja = keyof typeof HOJAS;
+
+function instrucciones(categorias: CategoriaOfrecida[], hoja?: Hoja): string {
   const lista = categorias
     .map((c) => `- ${c.codigo}: ${c.nombre}${c.descripcion ? ` — ${c.descripcion}` : ""}`)
     .join("\n");
@@ -194,6 +236,23 @@ SOBRE EL PRECIO. No tienes acceso a internet en esta llamada, así que el precio
 SOBRE EL ESTADO, EL MATERIAL Y LA ÉPOCA. Son para piezas usadas, de menaje, antigüedades, muñecas y colección. Dilos solo si las fotos los muestran: una pieza fotografiada de lejos no permite juzgar su estado, y un "buen estado" inventado hace que alguien compre algo trizado. null es la respuesta correcta cuando no se ve.
 
 SOBRE LA HONESTIDAD. Una foto borrosa, una pieza tapada a medias o un objeto que no logras identificar son situaciones normales. Cuando pasen, bájale a la confianza y escríbelo en advertencias. El sistema está hecho para que una persona revise y corrija; lo que no se puede corregir es un dato que parecía seguro y no lo era.
+
+${
+    hoja
+      ? `
+SOBRE LAS MEDIDAS. La pieza está apoyada sobre una hoja tamaño ${HOJAS[hoja].nombre}, que mide EXACTAMENTE ${HOJAS[hoja].ancho_cm} cm de ancho por ${HOJAS[hoja].alto_cm} cm de alto. Esa hoja es tu regla.
+
+Cómo usarla: mira cuántas veces cabe la pieza en el ancho o el alto de la hoja y convierte a centímetros. Devuelve ancho_cm y alto_cm con un decimal.
+
+Tres reglas que no se negocian:
+- Si NO ves la hoja completa, con sus cuatro esquinas, devuelve null en las dos medidas. Una hoja cortada por el borde de la foto no sirve como regla porque no sabes cuánto falta.
+- Si la foto está tomada muy en diagonal, la hoja se ve como un rombo y las proporciones se deforman. Devuelve null y dilo en las advertencias.
+- Si la pieza no está APOYADA sobre la hoja sino delante o detrás, está a otra distancia de la cámara y la comparación no vale. Devuelve null.
+
+Estas tres situaciones son normales y null es la respuesta correcta en todas. Una medida inventada termina en una etiqueta de despacho, y una caja pedida con medidas falsas llega aplastada.`
+      : `
+SOBRE LAS MEDIDAS. No hay ninguna referencia de tamaño en estas fotos, así que devuelve null en ancho_cm y alto_cm SIEMPRE. No las estimes por el tipo de objeto: saber que una taza suele medir nueve centímetros no es haber medido ESTA taza, y el número se vería igual de seguro que uno medido de verdad.`
+  }
 
 Escribe en español de Chile, sin adornos.`;
 }
@@ -235,6 +294,10 @@ export type ImagenParaAnalizar = { datos: Buffer; mime: MimeImagen };
 export async function analizaImagen(
   imagenes: ImagenParaAnalizar[],
   categorias: CategoriaOfrecida[],
+  /* Cuando viene, la pieza esta apoyada sobre una hoja de ese tamaño y el
+     modelo la usa como regla para medirla. Sin esto, las medidas vuelven
+     siempre en null: ver la nota del prompt. */
+  hoja?: Hoja,
 ): Promise<ResultadoAnalisis> {
   const clave = claveAnthropic();
   const inicio = Date.now();
@@ -265,7 +328,7 @@ export async function analizaImagen(
         format: zodOutputFormat(EsquemaAnalisis),
         effort: "low",
       },
-      system: instrucciones(categorias),
+      system: instrucciones(categorias, hoja),
       messages: [
         {
           role: "user",

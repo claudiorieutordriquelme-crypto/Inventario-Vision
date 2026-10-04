@@ -237,6 +237,54 @@ export function FormularioFoto({ analisisDisponible }: { analisisDisponible: boo
           </p>
         )}
 
+        {/*
+          MEDIR CON UNA HOJA, y es opcional a propósito.
+
+          Una foto es una proyección: sin algo de tamaño conocido en el
+          encuadre, los centímetros no se pueden recuperar. Una pieza chica
+          cerca y una grande lejos dan la misma imagen. La hoja es la regla.
+
+          Se eligió una hoja y no una moneda ni una tarjeta por dos razones
+          medibles: cuanto mayor la referencia respecto del objeto menor el
+          error, y una hoja tiene cuatro esquinas, así que su forma en la foto
+          delata si la cámara estaba inclinada.
+
+          Si no marcas nada, los campos de medida quedan vacíos. Lo que NO
+          hace el sistema es rellenarlos con una conjetura del tipo de objeto:
+          saber cuánto mide una taza típica no es haber medido la tuya, y el
+          número se vería igual de seguro que uno real.
+        */}
+        <details className="mt-4 rounded-lg border border-gris-200 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-gris-800">
+            Medir la pieza con una hoja
+          </summary>
+
+          <p className="mt-2 max-w-prose text-sm text-gris-600">
+            Apoya la pieza sobre una hoja y sácale una foto desde arriba, con la
+            hoja completa dentro del encuadre. Con eso puedo calcular el largo y
+            el ancho. Sin hoja, esos campos quedan vacíos y los llenas con
+            huincha.
+          </p>
+
+          <label className="mt-3 block max-w-xs">
+            <span className="text-sm font-semibold text-gris-800">Hoja que usaste</span>
+            <select
+              name="hoja"
+              defaultValue=""
+              className="mt-1.5 w-full rounded-md border border-gris-300 px-3 py-2.5 text-base text-gris-900"
+            >
+              <option value="">Ninguna, no medir</option>
+              <option value="carta">Carta (21,6 × 27,9 cm)</option>
+              <option value="a4">A4 (21 × 29,7 cm)</option>
+            </select>
+          </label>
+
+          <p className="mt-2 text-xs text-gris-500">
+            La altura de la pieza parada no sale de una foto desde arriba. Para
+            eso, huincha.
+          </p>
+        </details>
+
         <p className="mt-4 text-center text-xs text-gris-500">
           JPG, PNG o WebP, hasta 10 MB cada una. Mínimo {MINIMO}, máximo {MAXIMO}. Las
           tomadas con la cámara se reducen antes de subirse, para que la subida
