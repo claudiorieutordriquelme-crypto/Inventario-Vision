@@ -44,20 +44,21 @@ export const MODELO = "claude-opus-5";
   esta constante sube, y así se puede saber qué resultados vinieron de qué
   instrucciones. Sin esto, comparar la calidad entre dos épocas es imposible.
 */
-export const VERSION_PROMPT = "2026-09-03.2-multiple";
+export const VERSION_PROMPT = "2026-10-03.1-pieza-central";
 
 /* Tarifa de claude-opus-5 por millón de tokens, para estimar el costo. */
 const USD_POR_MTOK_ENTRADA = 5;
 const USD_POR_MTOK_SALIDA = 25;
 
 /*
-  Tope de productos por foto. No es una preferencia: una foto de una estantería
-  entera daría treinta entradas que nadie va a revisar una por una, y cada una
-  entraría al inventario como borrador. Doce es lo que cabe en una mesa y se
-  alcanza a revisar de una sentada. Si el modelo ve más, lo dice en la
-  observación general y la pantalla lo muestra.
+  Tope de imágenes por análisis.
+
+  Las fotos son del MISMO producto, de frente, de atrás y del detalle. Seis es
+  más de lo que nadie saca de una pieza, y cada una suma tokens de entrada: el
+  costo del análisis crece con la cantidad de imágenes, no con la cantidad de
+  productos.
 */
-export const MAXIMO_POR_FOTO = 12;
+export const MAXIMO_IMAGENES = 6;
 
 const MIME_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
 export type MimeImagen = (typeof MIME_PERMITIDOS)[number];
@@ -84,11 +85,6 @@ const EsquemaProducto = z.object({
     .describe(
       "Dos o tres frases: qué es, para qué sirve y cualquier característica visible que ayude a identificarlo entre varios parecidos.",
     ),
-  ubicacion_en_foto: z
-    .string()
-    .describe(
-      "Dónde está en la imagen, en palabras que sirvan para encontrarlo: 'arriba a la izquierda', 'el rojo del centro', 'el más grande, al fondo'. Cuando hay un solo producto, escribe 'toda la imagen'.",
-    ),
   categoria_codigo: z
     .string()
     .nullable()
@@ -105,7 +101,28 @@ const EsquemaProducto = z.object({
     .int()
     .nullable()
     .describe(
-      "Cuántas unidades DE ESTE MISMO producto se ven. Si hay tres martillos idénticos, esto es 3 y va en una sola entrada. null si no se puede contar con seguridad.",
+      "Cuántas unidades idénticas de ESTA MISMA pieza central se ven juntas. Casi siempre 1. null si no se puede contar con seguridad.",
+    ),
+  /*
+    Atributos del rubro. Se piden acá porque las fotos son de UNA pieza y hay
+    varias: con el frente, el reverso y el detalle se puede decir algo del
+    estado y del material. Con una foto de seis cosas en una mesa, no.
+  */
+  estado_conservacion: z
+    .enum(["nuevo", "como_nuevo", "buen_estado", "usado", "para_restaurar"])
+    .nullable()
+    .describe(
+      "Estado visible de la pieza. null si las fotos no alcanzan para juzgarlo. No lo adivines por el tipo de objeto.",
+    ),
+  material: z
+    .string()
+    .nullable()
+    .describe("Material principal si se reconoce: porcelana, roble, bronce, plástico. null si no."),
+  epoca: z
+    .string()
+    .nullable()
+    .describe(
+      "Época aproximada en palabras, si el estilo la delata: 'años 50', 'mediados del siglo XX'. null si no tienes base.",
     ),
   precio_estimado_clp: z
     .number()
@@ -128,15 +145,13 @@ const EsquemaProducto = z.object({
 });
 
 const EsquemaAnalisis = z.object({
-  productos: z
-    .array(EsquemaProducto)
-    .describe(
-      `Un elemento por cada producto DISTINTO que veas. Máximo ${MAXIMO_POR_FOTO}. Si no reconoces ningún producto, devuelve la lista vacía.`,
-    ),
+  producto: EsquemaProducto.nullable().describe(
+    "La pieza que ocupa el centro de las fotos. null si no hay ninguna pieza identificable al centro.",
+  ),
   observacion_general: z
     .string()
     .describe(
-      "Una frase sobre la foto completa: si está borrosa, mal iluminada, si hay más productos de los que alcanzaste a listar, o si en realidad no es una foto de productos. Cadena vacía si no hay nada que decir.",
+      "Una frase sobre las fotos: si están borrosas, mal iluminadas, si no se distingue cuál es la pieza central, o si en realidad no son fotos de un producto. Cadena vacía si no hay nada que decir.",
     ),
 });
 
@@ -150,21 +165,23 @@ function instrucciones(categorias: CategoriaOfrecida[]): string {
     .map((c) => `- ${c.codigo}: ${c.nombre}${c.descripcion ? ` — ${c.descripcion}` : ""}`)
     .join("\n");
 
-  return `Eres el asistente de un sistema de control de inventario en Chile. Recibes la foto de uno o varios productos y devuelves los datos para darlos de alta.
+  return `Eres el asistente de un sistema de control de inventario en Chile. Recibes varias fotos de UNA MISMA PIEZA y devuelves sus datos para darla de alta.
 
-LA REGLA MÁS IMPORTANTE: PRODUCTOS DISTINTOS CONTRA UNIDADES DEL MISMO.
+LA REGLA MÁS IMPORTANTE: SOLO LA PIEZA DEL CENTRO.
 
-Un martillo, un alicate y un destornillador en la misma foto son TRES entradas de la lista.
-Tres martillos idénticos son UNA entrada con cantidad_visible 3.
-Un martillo y tres alicates idénticos son DOS entradas: el martillo con cantidad 1, el alicate con cantidad 3.
+Las fotos las saca alguien que puso una pieza al centro del encuadre, a propósito, y apretó el disparador. Detrás hay una bodega, una mesa, un estante, una casa. TODO ESO ES FONDO Y SE IGNORA.
 
-Confundir las dos cosas rompe el inventario en las dos direcciones. Doce entradas de un mismo tornillo llenan el sistema de basura que hay que borrar a mano. Un martillo y un alicate sumados como "2 unidades" crean un producto que no existe y esconde los dos que sí.
+No catalogues la repisa donde está apoyada la pieza. No catalogues las cosas del estante de atrás. No catalogues la mano que la sostiene ni el mantel. Si al centro hay una taza y atrás se ven otras veinte, el producto es la taza del centro y las otras veinte no existen para ti.
 
-Cuando dudes si dos objetos son el mismo producto, míralos como los miraría bodega: si se guardarían en la misma caja y se pedirían con el mismo código, son el mismo producto. Si uno es de 12 pulgadas y el otro de 16, son distintos.
+Cómo reconocer cuál es: está al centro, está enfocada, y es lo que ocupa más superficie en primer plano. Si dudas entre dos, elige la que está más al centro y más nítida.
 
-Máximo ${MAXIMO_POR_FOTO} productos por foto. Si ves más, lista los ${MAXIMO_POR_FOTO} más claros y dilo en observacion_general.
+Si de verdad no hay ninguna pieza identificable al centro, devuelve producto en null y explícalo en observacion_general. Es una respuesta válida.
 
-CATEGORÍAS DISPONIBLES. Para cada producto, elige el código exacto de una de estas, o null:
+LAS FOTOS SON DE LA MISMA PIEZA, no de piezas distintas. Vienen el frente, el reverso, un detalle. Úsalas juntas: lo que no se ve en una puede verse en otra, y entre todas se arma una sola ficha. No devuelvas una ficha por foto.
+
+cantidad_visible casi siempre es 1. Solo es mayor si al centro hay varias unidades IDÉNTICAS de la misma pieza, juntas y evidentemente en conjunto, como un juego de seis copas iguales.
+
+CATEGORÍAS DISPONIBLES. Elige el código exacto de una de estas, o null:
 ${lista}
 
 Si ninguna calza bien, devuelve null en categoria_codigo. No inventes códigos: un código que no está en esta lista deja el producto sin clasificar igual, y además obliga a alguien a descubrir por qué.
@@ -174,9 +191,9 @@ SOBRE EL PRECIO. No tienes acceso a internet en esta llamada, así que el precio
 - Si no tienes base razonable para estimar, devuelve null. Es una respuesta válida y preferible a un número inventado.
 - No presentes el precio como un dato de mercado actual. Alguien lo va a revisar.
 
-SOBRE UBICACION_EN_FOTO. Es lo que va a permitir que una persona, mirando la foto, sepa cuál de los seis productos de la lista es cuál. Escribe algo que sirva para encontrarlo: la posición, el color, el tamaño relativo. "Producto 3" no sirve.
+SOBRE EL ESTADO, EL MATERIAL Y LA ÉPOCA. Son para piezas usadas, de menaje, antigüedades, muñecas y colección. Dilos solo si las fotos los muestran: una pieza fotografiada de lejos no permite juzgar su estado, y un "buen estado" inventado hace que alguien compre algo trizado. null es la respuesta correcta cuando no se ve.
 
-SOBRE LA HONESTIDAD. Una foto borrosa, un producto tapado a medias o un objeto que no logras identificar son situaciones normales en una bodega. Cuando pasen, bájale a la confianza de ese producto y escríbelo en sus advertencias. Si la foto no muestra productos identificables, devuelve la lista vacía y explícalo en observacion_general. El sistema está hecho para que una persona revise y corrija; lo que no se puede corregir es un dato que parecía seguro y no lo era.
+SOBRE LA HONESTIDAD. Una foto borrosa, una pieza tapada a medias o un objeto que no logras identificar son situaciones normales. Cuando pasen, bájale a la confianza y escríbelo en advertencias. El sistema está hecho para que una persona revise y corrija; lo que no se puede corregir es un dato que parecía seguro y no lo era.
 
 Escribe en español de Chile, sin adornos.`;
 }
@@ -196,23 +213,27 @@ export type ResultadoAnalisis =
     }
   | { ok: false; error: string; duracionMs: number };
 
+export type ImagenParaAnalizar = { datos: Buffer; mime: MimeImagen };
+
 /*
-  Analiza una imagen y devuelve TODOS los productos que reconoce.
+  Analiza varias fotos de UNA pieza y devuelve la ficha de la pieza central.
 
-  La imagen va en base64 dentro del mensaje y no por la Files API: se usa una
-  sola vez, subirla aparte sería un viaje más a la red por nada.
+  POR QUÉ VARIAS IMÁGENES EN UNA SOLA LLAMADA, y no una llamada por foto. Son
+  fotos del mismo objeto: el frente, el reverso, el detalle de la firma. Juntas
+  describen una pieza; por separado producirían tres fichas distintas del mismo
+  objeto, que es exactamente el problema que este cambio vino a resolver. Y
+  además cuesta menos: un solo prompt de sistema en vez de tres.
 
-  effort en "low" no es ahorrar por ahorrar. Identificar objetos en una foto y
-  describirlos es una tarea de un solo paso; el esfuerzo alto se gasta en
+  Las imágenes van en base64 dentro del mensaje y no por la Files API: se usan
+  una sola vez, subirlas aparte sería un viaje más a la red por nada.
+
+  effort en "low" no es ahorrar por ahorrar. Identificar un objeto y
+  describirlo es una tarea de un solo paso; el esfuerzo alto se gasta en
   razonamiento que acá no cambia el resultado. Si la calidad no alcanza, este
   es el primer dial que hay que mover, y está en un solo lugar.
-
-  max_tokens sube con el tope de productos: doce fichas completas necesitan
-  espacio, y quedarse corto trunca la respuesta a mitad de un producto.
 */
 export async function analizaImagen(
-  imagen: Buffer,
-  mime: MimeImagen,
+  imagenes: ImagenParaAnalizar[],
   categorias: CategoriaOfrecida[],
 ): Promise<ResultadoAnalisis> {
   const clave = claveAnthropic();
@@ -227,12 +248,19 @@ export async function analizaImagen(
     };
   }
 
+  if (imagenes.length === 0) {
+    return { ok: false, error: "No hay ninguna foto que analizar.", duracionMs: 0 };
+  }
+
   const client = new Anthropic({ apiKey: clave });
+  /* El tope se aplica acá y no solo se pide en el prompt: es lo que garantiza
+     que el costo de un análisis no pueda dispararse por una carga masiva. */
+  const usadas = imagenes.slice(0, MAXIMO_IMAGENES);
 
   try {
     const respuesta = await client.messages.parse({
       model: MODELO,
-      max_tokens: 12000,
+      max_tokens: 4000,
       output_config: {
         format: zodOutputFormat(EsquemaAnalisis),
         effort: "low",
@@ -242,13 +270,20 @@ export async function analizaImagen(
         {
           role: "user",
           content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: mime, data: imagen.toString("base64") },
-            },
+            ...usadas.map((img) => ({
+              type: "image" as const,
+              source: {
+                type: "base64" as const,
+                media_type: img.mime,
+                data: img.datos.toString("base64"),
+              },
+            })),
             {
               type: "text",
-              text: "Identifica todos los productos distintos que veas en esta foto y devuelve sus datos para darlos de alta en el inventario.",
+              text:
+                usadas.length === 1
+                  ? "Identifica la pieza que está al centro de esta foto, ignorando el fondo, y devuelve sus datos para darla de alta en el inventario."
+                  : `Estas ${usadas.length} fotos son de LA MISMA pieza, desde distintos ángulos. Identifica la pieza central, ignorando el fondo, y devuelve UNA sola ficha con sus datos.`,
             },
           ],
         },
@@ -272,15 +307,14 @@ export async function analizaImagen(
     }
 
     /*
-      Quedarse sin tokens con una lista larga deja el último producto a medias.
-      Se trata como error en vez de guardar una ficha truncada: media ficha
-      parece una ficha completa y nadie la revisaría dos veces.
+      Una respuesta cortada deja la ficha a medias. Se trata como error en vez
+      de guardarla: media ficha parece una ficha completa y nadie la revisaría
+      dos veces.
     */
     if (respuesta.stop_reason === "max_tokens") {
       return {
         ok: false,
-        error:
-          "La foto tiene demasiados productos y la respuesta se cortó. Sácale fotos por grupos más chicos.",
+        error: "La respuesta del análisis se cortó. Intenta de nuevo con menos fotos.",
         duracionMs,
       };
     }
@@ -296,22 +330,12 @@ export async function analizaImagen(
 
     const analisis = respuesta.parsed_output;
 
-    /*
-      El tope se aplica también acá y no solo se pide en el prompt. Una
-      instrucción es una petición; esto es una garantía, y de ella depende que
-      una foto no pueda crear treinta borradores de una vez.
-    */
-    const recortado: Analisis = {
-      ...analisis,
-      productos: analisis.productos.slice(0, MAXIMO_POR_FOTO),
-    };
-
     const tokensEntrada = respuesta.usage.input_tokens;
     const tokensSalida = respuesta.usage.output_tokens;
 
     return {
       ok: true,
-      analisis: recortado,
+      analisis,
       bruto: respuesta.content,
       modelo: MODELO,
       versionPrompt: VERSION_PROMPT,

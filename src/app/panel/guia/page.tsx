@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { DESCRIPCION_ROL, ETIQUETA_ROL, PERMISOS, ROLES, perfilHabilitado } from "@/lib/auth";
 import { hayAnalisisDisponible } from "@/lib/env";
 import { ETIQUETA_MOVIMIENTO, PRESENTACION_ESTADO } from "@/lib/formato";
-import { MAXIMO_POR_FOTO } from "@/lib/vision";
 import type { EstadoProducto, TipoMovimiento } from "@/lib/tipos";
 
 export const metadata: Metadata = {
@@ -225,8 +224,8 @@ export default async function GuiaPage() {
             {[
               {
                 n: "01",
-                t: "Una foto, varios productos",
-                d: `En una misma imagen se identifican hasta ${MAXIMO_POR_FOTO} productos distintos y se crea una ficha por cada uno.`,
+                t: "Una pieza, varias fotos",
+                d: "Se cataloga solo la pieza que queda dentro del marco del visor. Lo que salga de fondo se ignora, y todas las fotos van a la misma ficha.",
               },
               {
                 n: "02",
