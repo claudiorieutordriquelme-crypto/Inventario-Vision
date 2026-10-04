@@ -106,15 +106,19 @@ export default async function ProductoPage({
           </Link>
 
           {/*
-            La etiqueta se abre en otra pestaña: imprimir deja la ventana en un
-            estado raro y volver atrás desde ahí perdería la ficha que se estaba
-            revisando.
+            En pantalla grande el botón vive acá arriba. En el teléfono está en
+            la barra fija del final: arriba quedaría fuera de vista apenas se
+            empieza a bajar, y es la acción que más se usa con la pieza en la
+            mano.
+
+            Se abre en otra pestaña: imprimir deja la ventana en un estado raro
+            y volver atrás desde ahí perdería la ficha que se estaba revisando.
           */}
           <a
             href={`/panel/productos/${producto.id}/etiqueta`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-md border border-gris-300 px-3 py-2 text-sm font-semibold text-gris-800 transition-colors hover:border-primario hover:text-primario"
+            className="hidden items-center gap-2 rounded-md border border-gris-300 px-3 py-2 text-sm font-semibold text-gris-800 transition-colors hover:border-primario hover:text-primario sm:inline-flex"
           >
             <svg viewBox="0 0 24 24" className="size-4 shrink-0 fill-current" aria-hidden="true">
               <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8 0h2v2h-2v-2zm4-2h2v2h2v2h-2v2h-2v2h-2v-2h-2v-2h2v-4h2v2h2v-2zm2 6h2v2h-2v-2z" />
@@ -144,11 +148,51 @@ export default async function ProductoPage({
       </div>
 
       {/*
+        ── NAVEGACIÓN INTERNA, SOLO EN TELÉFONO ──────────────────────────────
+
+        Esta ficha es larga: imágenes, cifras, un formulario de quince campos,
+        las referencias web y el libro de movimientos. En una pantalla grande
+        se ve casi entera y el scroll basta. En un teléfono son seis o siete
+        pantallas, y llegar a los movimientos para registrar un ajuste exige
+        pasar por todo lo demás cada vez.
+
+        Son anclas, no pestañas: nada se esconde, el contenido sigue completo y
+        en orden. Quien baje normalmente no nota la diferencia; quien sabe a
+        qué viene, llega de un toque. Y como son enlaces de verdad, funcionan
+        sin JavaScript y el botón atrás deshace el salto.
+      */}
+      <nav aria-label="Secciones de la ficha" className="sm:hidden">
+        <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {[
+            { id: "imagenes", nombre: "Imágenes" },
+            { id: "cifras", nombre: "Cifras" },
+            { id: "datos", nombre: "Datos" },
+            { id: "referencias", nombre: "Referencias" },
+            { id: "movimientos", nombre: "Movimientos" },
+          ].map((s) => (
+            <li key={s.id} className="shrink-0">
+              <a
+                href={`#${s.id}`}
+                className="inline-block rounded-full border border-gris-300 px-3 py-1.5 text-sm font-semibold text-gris-700"
+              >
+                {s.nombre}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/*
         La galería va a lo ancho y antes de las cifras. Las imágenes son lo
         primero que se mira de una pieza usada, y además son lo que decide si
         el producto se puede confirmar: meterlas en una columna lateral dejaba
         el aviso de "incompleto" fuera de la vista.
+
+        scroll-mt deja aire sobre el título al saltar desde la navegación: sin
+        él, la barra pegajosa del panel tapa justo el encabezado de la sección
+        a la que se acaba de llegar.
       */}
+      <div id="imagenes" className="scroll-mt-28">
       <Galeria
         productoId={producto.id}
         nombre={producto.nombre}
@@ -156,8 +200,9 @@ export default async function ProductoPage({
         puedeOperar={puedeOperar}
         errorLectura={errorImagenes}
       />
+      </div>
 
-      <section>
+      <section id="cifras" className="scroll-mt-28">
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg border border-gris-200 p-4">
             <dt className="text-xs font-semibold tracking-wide text-gris-500 uppercase">
@@ -225,14 +270,14 @@ export default async function ProductoPage({
         </section>
       ) : null}
 
-      <section className="space-y-3 border-t border-gris-200 pt-6">
+      <section id="datos" className="scroll-mt-28 space-y-3 border-t border-gris-200 pt-6">
         <h2 className="text-sm font-bold tracking-widest text-gris-500 uppercase">
           Datos del producto
         </h2>
         <EditarProducto producto={producto} categorias={categorias} puedeOperar={puedeOperar} />
       </section>
 
-      <section className="border-t border-gris-200 pt-6">
+      <section id="referencias" className="scroll-mt-28 border-t border-gris-200 pt-6">
         <Referencias
           productoId={producto.id}
           guardadas={referencias}
@@ -241,7 +286,7 @@ export default async function ProductoPage({
         />
       </section>
 
-      <section className="space-y-3 border-t border-gris-200 pt-6">
+      <section id="movimientos" className="scroll-mt-28 space-y-3 border-t border-gris-200 pt-6">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-bold tracking-widest text-gris-500 uppercase">
             Movimientos
@@ -308,6 +353,38 @@ export default async function ProductoPage({
           />
         </section>
       ) : null}
+
+      {/*
+        ── BARRA DE ACCIÓN FIJA, SOLO EN TELÉFONO ────────────────────────────
+
+        Imprimir la etiqueta es lo que más se hace con la pieza en la mano, y
+        arriba quedaba fuera de vista apenas se empezaba a bajar. En una ficha
+        de seis pantallas, una acción que exige volver al principio es una
+        acción que se deja para después.
+
+        Va pegada abajo, que es donde llega el pulgar sosteniendo el teléfono,
+        con fondo opaco para que el contenido no se lea a través. El padding de
+        abajo respeta la zona del gesto de inicio del sistema: sin él, el botón
+        queda justo bajo la barra del iPhone y se aprieta la del sistema.
+
+        El espaciador de arriba evita que la barra tape la última sección
+        cuando se llega al final del scroll.
+      */}
+      <div className="h-20 sm:hidden" aria-hidden="true" />
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-gris-200 bg-blanco/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:hidden">
+        <a
+          href={`/panel/productos/${producto.id}/etiqueta`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primario px-5 py-3.5 text-base font-semibold text-blanco"
+        >
+          <svg viewBox="0 0 24 24" className="size-5 shrink-0 fill-current" aria-hidden="true">
+            <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm8 0h2v2h-2v-2zm4-2h2v2h2v2h-2v2h-2v2h-2v-2h-2v-2h2v-4h2v2h2v-2zm2 6h2v2h-2v-2z" />
+          </svg>
+          Generar etiqueta QR
+        </a>
+      </div>
     </div>
   );
 }

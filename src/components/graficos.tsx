@@ -116,9 +116,26 @@ export function LineaTiempo({
 
   return (
     <figure className="m-0">
+      {/*
+        ── POR QUÉ EL GRÁFICO SE DESLIZA EN VEZ DE ENCOGERSE ─────────────────
+
+        El SVG tiene un viewBox de 720 de ancho. Con w-full a secas, en un
+        teléfono de 360 píxeles se escala a la mitad y TODO escala con él,
+        incluido el texto: las etiquetas de 11px se dibujan a cinco y seis
+        píxeles, que no se leen. El gráfico se veía "bien" en la captura y era
+        inservible en la mano.
+
+        Con un ancho mínimo dentro de un contenedor que se desplaza, el gráfico
+        conserva su tamaño real y en pantalla chica se corre con el dedo. Se
+        prefiere eso a achicar el texto: un eje ilegible no es un eje.
+
+        En pantalla grande no cambia nada, porque ahí el ancho disponible ya
+        supera el mínimo.
+      */}
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <svg
         viewBox={`0 0 ${ancho} ${alto}`}
-        className="h-auto w-full"
+        className="h-auto w-full min-w-[44rem]"
         role="img"
         aria-label={`Evolución: ${datos.map((d) => `${d.etiqueta}, ${fmt(d.valor)}`).join("; ")}`}
       >
@@ -183,6 +200,7 @@ export function LineaTiempo({
           })}
         </g>
       </svg>
+      </div>
 
       {/* El detalle al pasar por encima va como texto debajo y no como globo
           flotante: en un teléfono no hay "pasar por encima", y un globo que
@@ -314,7 +332,9 @@ export function BarrasApiladas({
 
   return (
     <figure className="m-0">
-      <svg viewBox={`0 0 ${ancho} ${alto}`} className="h-auto w-full" role="img" aria-label="Ventas por categoría y mes">
+      {/* Mismo motivo que en la línea: encogerlo haría ilegibles los ejes. */}
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      <svg viewBox={`0 0 ${ancho} ${alto}`} className="h-auto w-full min-w-[44rem]" role="img" aria-label="Ventas por categoría y mes">
         <g transform={`translate(${margen.izquierda},${margen.arriba})`}>
           {marcas.map((m) => (
             <g key={m}>
@@ -378,13 +398,14 @@ export function BarrasApiladas({
           })}
         </g>
       </svg>
+      </div>
 
       <figcaption
         aria-live="polite"
         className={`mt-1 text-center text-sm ${encima === null ? "text-gris-500" : "font-semibold text-gris-900"}`}
       >
         {encima === null
-          ? "Pasa por encima de un bloque para ver su detalle"
+          ? "Toca un bloque para ver su detalle"
           : `${meses[encima.mes]} · ${series[encima.serie].nombre}: ${formateaPesos(
               series[encima.serie].valores[encima.mes] ?? 0,
             )}`}

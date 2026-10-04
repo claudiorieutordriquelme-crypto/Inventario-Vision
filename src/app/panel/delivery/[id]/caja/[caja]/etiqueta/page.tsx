@@ -3,6 +3,7 @@ import QRCode from "qrcode";
 import { headers } from "next/headers";
 import { perfilHabilitado } from "@/lib/auth";
 import { obtenerDespacho } from "@/lib/datos/comercial";
+import { BotonImprimir } from "@/components/boton-imprimir";
 
 export const dynamic = "force-dynamic";
 
@@ -76,10 +77,11 @@ export default async function EtiquetaPage({
         }
       `}</style>
 
-      <div className="no-imprimir mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-gris-200 pb-3">
-        <p className="text-sm text-gris-600">
-          Esta página está hecha para imprimirse. Usa Ctrl+P.
-        </p>
+      <div className="no-imprimir mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gris-200 pb-3">
+        <p className="text-sm text-gris-600">Pega esta etiqueta en la caja.</p>
+        {/* En un teléfono no hay Ctrl+P, y el menú de imprimir está escondido
+            con un nombre distinto en cada navegador. */}
+        <BotonImprimir>Imprimir etiqueta</BotonImprimir>
       </div>
 
       <div className="border-2 border-negro p-4">

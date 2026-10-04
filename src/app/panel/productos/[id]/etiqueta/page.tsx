@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { perfilHabilitado } from "@/lib/auth";
 import { obtenerProducto } from "@/lib/datos/inventario";
 import { formateaPesos, procedenciaPrecio } from "@/lib/formato";
+import { BotonImprimir } from "@/components/boton-imprimir";
 
 export const dynamic = "force-dynamic";
 
@@ -104,9 +105,16 @@ export default async function EtiquetaProductoPage({
       `}</style>
 
       <div className="no-imprimir mb-5 rounded-lg border border-gris-200 p-4">
-        <p className="text-sm text-gris-600">
-          Esta página está hecha para imprimirse. Usa Ctrl+P, o Cmd+P en Mac.
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-gris-600">
+            Elige el tamaño y las copias, y después imprime.
+          </p>
+          {/* En un teléfono no hay Ctrl+P: imprimir está escondido en el menú
+              del navegador con un nombre distinto en cada uno. El botón abre el
+              mismo diálogo en todas partes, y ahí también se puede guardar como
+              PDF para mandarlo a imprimir después. */}
+          <BotonImprimir>Imprimir etiqueta</BotonImprimir>
+        </div>
 
         <form method="get" className="mt-3 flex flex-wrap items-end gap-3">
           <label className="block">
